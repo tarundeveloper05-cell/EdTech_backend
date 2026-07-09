@@ -10,7 +10,18 @@ from alembic import context
 # Import app configuration and metadata
 from app.core.config import settings
 from app.core.database import Base
-from app.models import User, Role, Permission, RolePermission
+from app.models import (
+    Admin,
+    Department,
+    Parent,
+    ParentStudent,
+    Permission,
+    Role,
+    RolePermission,
+    Student,
+    Teacher,
+    User,
+)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

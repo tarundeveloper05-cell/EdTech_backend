@@ -1,0 +1,38 @@
+from datetime import date
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class TeacherCreate(BaseModel):
+    user_id: UUID
+    employee_id: str = Field(..., min_length=1, max_length=50)
+    qualification: Optional[str] = Field(None, max_length=255)
+    department_id: Optional[UUID] = None
+    join_date: Optional[date] = None
+    phone: Optional[str] = Field(None, max_length=20)
+    address: Optional[str] = None
+
+
+class TeacherUpdate(BaseModel):
+    user_id: Optional[UUID] = None
+    employee_id: Optional[str] = Field(None, min_length=1, max_length=50)
+    qualification: Optional[str] = Field(None, max_length=255)
+    department_id: Optional[UUID] = None
+    join_date: Optional[date] = None
+    phone: Optional[str] = Field(None, max_length=20)
+    address: Optional[str] = None
+
+
+class TeacherResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_id: UUID
+    employee_id: str
+    qualification: Optional[str] = None
+    department_id: Optional[UUID] = None
+    join_date: Optional[date] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None

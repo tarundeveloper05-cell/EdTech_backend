@@ -1,30 +1,20 @@
 from datetime import timedelta
-from typing import AsyncGenerator
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import get_db
+from app.models.role import Role
 from app.services.auth_service import AuthService
 from app.schemas.user import UserCreate, UserResponse
 from app.models.user import User
 
-DATABASE_URL = "postgresql+asyncpg://user:password@localhost/dbname"
-
-engine = create_async_engine(DATABASE_URL, echo=False)
-AsyncSessionLocal = async_sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
-)
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
 router = APIRouter()
-
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with AsyncSessionLocal() as session:
-        yield session
 
 
 async def get_current_user(
@@ -45,7 +35,12 @@ async def get_current_user(
     if user_id is None:
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.id == int(user_id)))
+    try:
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise credentials_exception
+
+    result = await db.execute(select(User).where(User.id == user_uuid))
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
@@ -58,21 +53,37 @@ async def register(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    result = await db.execute(select(User).where(User.email == user_in.email))
-    existing_user = result.scalar_one_or_none()
-    if existing_user is not None:
+    email_result = await db.execute(select(User).where(User.email == user_in.email))
+    if email_result.scalar_one_or_none() is not None:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
+        )
+
+    username_result = await db.execute(
+        select(User).where(User.username == user_in.username)
+    )
+    if username_result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already registered",
+        )
+
+    role = await db.get(Role, user_in.role_id)
+    if role is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found",
         )
 
     hashed_password = AuthService.hash_password(user_in.password)
     new_user = User(
+        username=user_in.username,
         email=user_in.email,
         password_hash=hashed_password,
-        first_name=user_in.first_name,
-        last_name=user_in.last_name,
-        is_active=user_in.is_active,
+        phone=user_in.phone,
+        status=user_in.status,
+        role_id=user_in.role_id,
     )
 
     db.add(new_user)
@@ -99,7 +110,7 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    if not user.is_active:
+    if not user.status:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user",
