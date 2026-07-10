@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.attendance_model import Attendance
     from app.models.admin_model import Admin
     from app.models.parent_model import Parent
     from app.models.role import Role
@@ -46,6 +47,9 @@ class User(Base):
     teacher: Mapped["Teacher | None"] = relationship(back_populates="user", uselist=False)
     parent: Mapped["Parent | None"] = relationship(back_populates="user", uselist=False)
     student: Mapped["Student | None"] = relationship(back_populates="user", uselist=False)
+    marked_attendance: Mapped[list["Attendance"]] = relationship(
+        back_populates="marked_by_user"
+    )
 
     @property
     def is_active(self) -> bool:

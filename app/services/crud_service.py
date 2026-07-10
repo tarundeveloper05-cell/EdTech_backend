@@ -5,8 +5,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.department_model import Department
+from app.models.class_model import Class
 from app.models.parent_model import Parent
 from app.models.student_model import Student
+from app.models.subject_model import Subject
+from app.models.teacher_model import Teacher
 from app.models.user import User
 from app.repositories.crud_repository import CRUDRepository
 
@@ -17,11 +20,13 @@ class CRUDService:
         repository: CRUDRepository,
         entity_name: str,
         unique_fields: tuple[str, ...] = (),
+        unique_constraints: tuple[tuple[str, ...], ...] = (),
         foreign_keys: dict[str, type] | None = None,
     ):
         self.repository = repository
         self.entity_name = entity_name
         self.unique_fields = unique_fields
+        self.unique_constraints = unique_constraints
         self.foreign_keys = foreign_keys or {}
 
     async def create(self, session: AsyncSession, data: dict[str, Any]) -> Any:
@@ -76,6 +81,19 @@ class CRUDService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"{field} already exists",
                 )
+        for fields in self.unique_constraints:
+            if not all(field in data and data[field] is not None for field in fields):
+                continue
+            values = {field: data[field] for field in fields}
+            existing = await self.repository.get_by_fields(
+                session, values, exclude_id=exclude_id
+            )
+            if existing is not None:
+                joined_fields = ", ".join(fields)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"{self.entity_name} with this {joined_fields} already exists",
+                )
 
     async def _validate_foreign_keys(
         self, session: AsyncSession, data: dict[str, Any]
@@ -93,5 +111,10 @@ class CRUDService:
 
 
 USER_FK = {"user_id": User}
+STUDENT_FKS = {"user_id": User, "class_id": Class}
 TEACHER_FKS = {"user_id": User, "department_id": Department}
 PARENT_STUDENT_FKS = {"parent_id": Parent, "student_id": Student}
+CLASS_FKS = {"class_teacher_id": Teacher}
+CLASS_SUBJECT_FKS = {"class_id": Class, "subject_id": Subject}
+TEACHER_SUBJECT_FKS = {"teacher_id": Teacher, "subject_id": Subject, "class_id": Class}
+TIMETABLE_FKS = {"teacher_id": Teacher, "subject_id": Subject, "class_id": Class}

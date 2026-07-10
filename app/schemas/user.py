@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_serializer
 
 
 class RoleResponse(BaseModel):
@@ -12,6 +12,10 @@ class RoleResponse(BaseModel):
     role_name: str
     description: Optional[str] = None
 
+    @field_serializer("id")
+    def serialize_role_id(self, value: UUID) -> str:
+        return f"{value.int & 0xffff:04d}"
+
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=1, max_length=255)
@@ -19,7 +23,7 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
     phone: Optional[str] = Field(None, max_length=20)
     status: bool = True
-    role_id: UUID
+    role_id: str = Field(..., min_length=4, max_length=36)
 
 
 class UserUpdate(BaseModel):
@@ -28,7 +32,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = Field(default=None, min_length=8, max_length=128)
     phone: Optional[str] = Field(None, max_length=20)
     status: Optional[bool] = None
-    role_id: Optional[UUID] = None
+    role_id: Optional[str] = Field(default=None, min_length=4, max_length=36)
 
 
 class UserResponse(BaseModel):
@@ -44,3 +48,12 @@ class UserResponse(BaseModel):
     role: Optional[RoleResponse] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    @field_serializer("role_id")
+    def serialize_role_id(self, value: UUID) -> str:
+        return f"{value.int & 0xffff:04d}"
+
+
+class UserCreateResponse(UserResponse):
+    created_id: Optional[UUID] = None
+    message: str = "User created successfully"

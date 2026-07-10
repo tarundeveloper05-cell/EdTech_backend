@@ -12,6 +12,7 @@ class StudentBase(BaseModel):
     gender: Optional[str] = Field(None, max_length=20)
     blood_group: Optional[str] = Field(None, max_length=10)
     class_name: Optional[str] = Field(None, max_length=100)
+    class_id: Optional[UUID] = None
     roll_no: Optional[str] = Field(None, max_length=50)
     joining_date: Optional[date] = None
     photo: Optional[str] = Field(None, max_length=500)
@@ -29,6 +30,7 @@ class StudentUpdate(BaseModel):
     gender: Optional[str] = Field(None, max_length=20)
     blood_group: Optional[str] = Field(None, max_length=10)
     class_name: Optional[str] = Field(None, max_length=100)
+    class_id: Optional[UUID] = None
     roll_no: Optional[str] = Field(None, max_length=50)
     joining_date: Optional[date] = None
     photo: Optional[str] = Field(None, max_length=500)
