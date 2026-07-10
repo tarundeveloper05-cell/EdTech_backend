@@ -23,11 +23,24 @@ class Student(Base):
     gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
     blood_group: Mapped[str | None] = mapped_column(String(10), nullable=True)
     class_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    class_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("classes.id"), nullable=True
+    )
     roll_no: Mapped[str | None] = mapped_column(String(50), nullable=True)
     joining_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     photo: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     user = relationship("User", back_populates="student", lazy="selectin")
+    class_ = relationship("Class", back_populates="students", lazy="selectin")
+    attendance_records = relationship(
+        "Attendance", back_populates="student", cascade="all, delete-orphan"
+    )
+    exam_results = relationship(
+        "ExamResult", back_populates="student", cascade="all, delete-orphan"
+    )
+    report_cards = relationship(
+        "ReportCard", back_populates="student", cascade="all, delete-orphan"
+    )
     parent_students = relationship(
         "ParentStudent", back_populates="student", cascade="all, delete-orphan"
     )

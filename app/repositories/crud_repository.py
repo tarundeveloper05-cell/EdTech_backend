@@ -39,6 +39,20 @@ class CRUDRepository(Generic[ModelT]):
         result = await session.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_by_fields(
+        self,
+        session: AsyncSession,
+        fields: dict[str, Any],
+        exclude_id: UUID | None = None,
+    ) -> ModelT | None:
+        query = select(self.model)
+        for field_name, value in fields.items():
+            query = query.where(getattr(self.model, field_name) == value)
+        if exclude_id is not None:
+            query = query.where(self.model.id != exclude_id)
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
+
     async def update(
         self, session: AsyncSession, item: ModelT, data: dict[str, Any]
     ) -> ModelT:

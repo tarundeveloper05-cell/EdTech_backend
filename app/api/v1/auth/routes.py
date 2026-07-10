@@ -7,9 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.models.role import Role
+from app.services.role_resolver import resolve_role
 from app.services.auth_service import AuthService
-from app.schemas.user import UserCreate, UserResponse
+from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
 from app.models.user import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
@@ -48,11 +48,11 @@ async def get_current_user(
     return user
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=UserCreateResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
-) -> User:
+) -> UserCreateResponse:
     email_result = await db.execute(select(User).where(User.email == user_in.email))
     if email_result.scalar_one_or_none() is not None:
         raise HTTPException(
@@ -69,12 +69,7 @@ async def register(
             detail="Username already registered",
         )
 
-    role = await db.get(Role, user_in.role_id)
-    if role is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Role not found",
-        )
+    role = await resolve_role(db, user_in.role_id)
 
     hashed_password = AuthService.hash_password(user_in.password)
     new_user = User(
@@ -83,14 +78,16 @@ async def register(
         password_hash=hashed_password,
         phone=user_in.phone,
         status=user_in.status,
-        role_id=user_in.role_id,
+        role_id=role.id,
     )
 
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)
 
-    return new_user
+    response = UserCreateResponse.model_validate(new_user)
+    response.created_id = new_user.id
+    return response
 
 
 @router.post("/login")

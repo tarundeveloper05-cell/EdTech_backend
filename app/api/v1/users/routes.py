@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.user import User
-from app.models.role import Role
+from app.services.role_resolver import resolve_role
 from app.schemas.user import (
     UserCreate,
+    UserCreateResponse,
     UserUpdate,
     UserResponse,
 )
@@ -20,13 +21,13 @@ router = APIRouter()
 
 @router.post(
     "/users",
-    response_model=UserResponse,
+    response_model=UserCreateResponse,
     status_code=status.HTTP_201_CREATED
 )
 async def create_user(
     user_data: UserCreate,
     session: Annotated[AsyncSession, Depends(get_db)]
-) -> UserResponse:
+) -> UserCreateResponse:
     """Create a new user."""
 
     result = await session.execute(
@@ -47,14 +48,7 @@ async def create_user(
             detail=f"A user with username {user_data.username} already exists."
         )
 
-    role_result = await session.execute(
-        select(Role).where(Role.id == user_data.role_id)
-    )
-    if role_result.scalar_one_or_none() is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Role with id {user_data.role_id} does not exist."
-        )
+    role = await resolve_role(session, user_data.role_id)
 
     user = User(
         username=user_data.username,
@@ -62,14 +56,16 @@ async def create_user(
         password_hash=hash_password(user_data.password),
         phone=user_data.phone,
         status=user_data.status,
-        role_id=user_data.role_id,
+        role_id=role.id,
     )
 
     session.add(user)
     await session.commit()
     await session.refresh(user)
 
-    return UserResponse.model_validate(user)
+    response = UserCreateResponse.model_validate(user)
+    response.created_id = user.id
+    return response
 
 
 @router.get(
@@ -154,6 +150,10 @@ async def update_user(
     if "password" in update_data:
         plain_password = update_data.pop("password")
         update_data["password_hash"] = hash_password(plain_password)
+
+    if "role_id" in update_data:
+        role = await resolve_role(session, update_data["role_id"])
+        update_data["role_id"] = role.id
 
     for field, value in update_data.items():
         setattr(user, field, value)

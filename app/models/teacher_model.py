@@ -28,3 +28,13 @@ class Teacher(Base):
 
     user = relationship("User", back_populates="teacher", lazy="selectin")
     department = relationship("Department", back_populates="teachers", lazy="selectin")
+    classes = relationship("Class", back_populates="class_teacher", lazy="selectin")
+    teacher_subjects = relationship(
+        "TeacherSubject", back_populates="teacher", cascade="all, delete-orphan"
+    )
+    timetables = relationship(
+        "Timetable", back_populates="teacher", cascade="all, delete-orphan"
+    )
+    attendance_records = relationship(
+        "Attendance", back_populates="teacher", cascade="all, delete-orphan"
+    )
