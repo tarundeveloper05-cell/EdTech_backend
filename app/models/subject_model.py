@@ -29,6 +29,7 @@ class Subject(Base):
     teacher_subjects = relationship(
         "TeacherSubject", back_populates="subject", cascade="all, delete-orphan"
     )
+    assignments = relationship("Assignment", back_populates="subject", cascade="all, delete-orphan")
     timetables = relationship(
         "Timetable", back_populates="subject", cascade="all, delete-orphan"
     )

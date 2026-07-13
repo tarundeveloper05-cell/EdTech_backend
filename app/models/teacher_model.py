@@ -38,3 +38,4 @@ class Teacher(Base):
     attendance_records = relationship(
         "Attendance", back_populates="teacher", cascade="all, delete-orphan"
     )
+    assignments = relationship("Assignment", back_populates="teacher", cascade="all, delete-orphan")

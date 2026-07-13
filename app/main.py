@@ -19,6 +19,9 @@ from app.api.v1.teacher_subject_router import router as teacher_subject_router
 from app.api.v1.timetable_router import router as timetable_router
 from app.api.v1.report_card_router import router as report_card_router
 from app.api.v1.users.routes import router as user_router
+from app.api.v1.assignment_router import router as assignment_router, submission_router, teacher_assignment_router, class_assignment_router, student_assignment_router
+from app.api.v1.communication_router import announcement_router, notification_router, message_router, user_communication_router
+from app.api.v1.fee_router import fee_structure_router, fee_invoice_router, payment_router, student_fee_router
 from .api.v1.auth.routes import router as auth_router
 
 
@@ -55,6 +58,19 @@ app.include_router(attendance_router, prefix="/attendance", tags=["Attendance"])
 app.include_router(exam_router, prefix="/exams", tags=["Exams"])
 app.include_router(exam_result_router, prefix="/exam-results", tags=["Exam Results"])
 app.include_router(report_card_router, prefix="/report-cards", tags=["Report Cards"])
+app.include_router(assignment_router, prefix="/assignments", tags=["Assignments"])
+app.include_router(submission_router, prefix="/assignment-submissions", tags=["Assignment Submissions"])
+app.include_router(teacher_assignment_router, prefix="/teachers", tags=["Teacher Assignments"])
+app.include_router(class_assignment_router, prefix="/classes", tags=["Class Assignments"])
+app.include_router(student_assignment_router, prefix="/students", tags=["Student Assignments"])
+app.include_router(announcement_router, prefix="/announcements", tags=["Announcements"])
+app.include_router(notification_router, prefix="/notifications", tags=["Notifications"])
+app.include_router(message_router, prefix="/messages", tags=["Messages"])
+app.include_router(user_communication_router, prefix="/users", tags=["User Communication"])
+app.include_router(fee_structure_router, prefix="/fee-structures", tags=["Fee Structures"])
+app.include_router(fee_invoice_router, prefix="/fee-invoices", tags=["Fee Invoices"])
+app.include_router(payment_router, prefix="/payments", tags=["Payments"])
+app.include_router(student_fee_router, prefix="/students", tags=["Student Fees"])
 app.include_router(user_router, tags=["Users"])
 app.include_router(auth_router, tags=["auth"])
 

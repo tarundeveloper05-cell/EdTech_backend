@@ -17,6 +17,9 @@ from .attendance_model import Attendance, AttendanceStatus
 from .exam_model import Exam
 from .exam_result_model import ExamResult
 from .report_card_model import ReportCard
+from .assignment_model import Assignment, AssignmentSubmission
+from .communication_model import Announcement, Notification, Message
+from .fee_model import FeeStructure, FeeInvoice, Payment
 
 Faculty = Teacher
 StudentParent = ParentStudent
