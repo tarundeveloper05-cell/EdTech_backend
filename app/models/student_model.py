@@ -50,3 +50,5 @@ class Student(Base):
         back_populates="students",
         viewonly=True,
     )
+    assignment_submissions = relationship("AssignmentSubmission", back_populates="student", cascade="all, delete-orphan")
+    fee_invoices = relationship("FeeInvoice", back_populates="student", cascade="all, delete-orphan")

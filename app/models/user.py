@@ -50,6 +50,10 @@ class User(Base):
     marked_attendance: Mapped[list["Attendance"]] = relationship(
         back_populates="marked_by_user"
     )
+    announcements = relationship("Announcement", back_populates="creator", foreign_keys="Announcement.created_by")
+    notifications = relationship("Notification", back_populates="user")
+    sent_messages = relationship("Message", back_populates="sender", foreign_keys="Message.sender_id")
+    received_messages = relationship("Message", back_populates="receiver", foreign_keys="Message.receiver_id")
 
     @property
     def is_active(self) -> bool:
