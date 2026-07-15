@@ -20,6 +20,12 @@ from .report_card_model import ReportCard
 from .assignment_model import Assignment, AssignmentSubmission
 from .communication_model import Announcement, Notification, Message
 from .fee_model import FeeStructure, FeeInvoice, Payment
+from .admission_model import (
+    AdmissionApplication,
+    AdmissionApplicationStatus,
+    AdmissionDocument,
+)
+from .leave_model import LeaveRequest, LeaveStatus, LeaveType
 
 Faculty = Teacher
 StudentParent = ParentStudent

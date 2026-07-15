@@ -54,6 +54,22 @@ class User(Base):
     notifications = relationship("Notification", back_populates="user")
     sent_messages = relationship("Message", back_populates="sender", foreign_keys="Message.sender_id")
     received_messages = relationship("Message", back_populates="receiver", foreign_keys="Message.receiver_id")
+    verified_documents = relationship(
+        "AdmissionDocument",
+        back_populates="verifier",
+        foreign_keys="AdmissionDocument.verified_by",
+    )
+    leave_requests = relationship(
+        "LeaveRequest",
+        back_populates="applicant",
+        foreign_keys="LeaveRequest.user_id",
+        cascade="all, delete-orphan",
+    )
+    approved_leave_requests = relationship(
+        "LeaveRequest",
+        back_populates="approver",
+        foreign_keys="LeaveRequest.approved_by",
+    )
 
     @property
     def is_active(self) -> bool:

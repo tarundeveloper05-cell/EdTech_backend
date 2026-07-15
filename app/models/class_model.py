@@ -43,3 +43,8 @@ class Class(Base):
     )
     exams = relationship("Exam", back_populates="class_", cascade="all, delete-orphan")
     assignments = relationship("Assignment", back_populates="class_", cascade="all, delete-orphan")
+    admission_applications = relationship(
+        "AdmissionApplication",
+        back_populates="class_",
+        cascade="all, delete-orphan",
+    )

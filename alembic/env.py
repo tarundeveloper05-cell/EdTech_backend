@@ -12,6 +12,9 @@ from app.core.config import settings
 from app.core.database import Base
 from app.models import (
     Admin,
+    AdmissionApplication,
+    AdmissionApplicationStatus,
+    AdmissionDocument,
     Attendance,
     AttendanceStatus,
     Class,
@@ -19,6 +22,9 @@ from app.models import (
     Department,
     Exam,
     ExamResult,
+    LeaveRequest,
+    LeaveStatus,
+    LeaveType,
     Parent,
     ParentStudent,
     Permission,

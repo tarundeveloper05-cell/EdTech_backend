@@ -4,6 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.admin_router import router as admin_router
+from app.api.v1.admission_router import (
+    application_router as admission_application_router,
+    document_router as admission_document_router,
+)
 from app.api.v1.attendance_router import router as attendance_router
 from app.api.v1.class_router import router as class_router
 from app.api.v1.class_subject_router import router as class_subject_router
@@ -22,6 +26,7 @@ from app.api.v1.users.routes import router as user_router
 from app.api.v1.assignment_router import router as assignment_router, submission_router, teacher_assignment_router, class_assignment_router, student_assignment_router
 from app.api.v1.communication_router import announcement_router, notification_router, message_router, user_communication_router
 from app.api.v1.fee_router import fee_structure_router, fee_invoice_router, payment_router, student_fee_router
+from app.api.v1.leave_router import leave_request_router, leave_type_router, user_leave_router
 from .api.v1.auth.routes import router as auth_router
 
 
@@ -71,6 +76,19 @@ app.include_router(fee_structure_router, prefix="/fee-structures", tags=["Fee St
 app.include_router(fee_invoice_router, prefix="/fee-invoices", tags=["Fee Invoices"])
 app.include_router(payment_router, prefix="/payments", tags=["Payments"])
 app.include_router(student_fee_router, prefix="/students", tags=["Student Fees"])
+app.include_router(
+    admission_application_router,
+    prefix="/admission-applications",
+    tags=["Admission Applications"],
+)
+app.include_router(
+    admission_document_router,
+    prefix="/admission-documents",
+    tags=["Admission Documents"],
+)
+app.include_router(leave_type_router, prefix="/leave-types", tags=["Leave Types"])
+app.include_router(leave_request_router, prefix="/leave-requests", tags=["Leave Requests"])
+app.include_router(user_leave_router, prefix="/users", tags=["User Leave Requests"])
 app.include_router(user_router, tags=["Users"])
 app.include_router(auth_router, tags=["auth"])
 
