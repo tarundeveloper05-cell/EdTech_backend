@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,7 +28,15 @@ from app.api.v1.assignment_router import router as assignment_router, submission
 from app.api.v1.communication_router import announcement_router, notification_router, message_router, user_communication_router
 from app.api.v1.fee_router import fee_structure_router, fee_invoice_router, payment_router, student_fee_router
 from app.api.v1.leave_router import leave_request_router, leave_type_router, user_leave_router
+from app.api.v1.event_router import academic_calendar_router, event_router
+from app.api.v1.library_router import book_category_router, book_issue_router, book_router, library_router, student_library_router
+from app.api.v1.transport_router import bus_router, route_router, student_transport_detail_router, student_transport_router, transport_router
 from .api.v1.auth.routes import router as auth_router
+from app.core.database import AsyncSessionLocal
+from app.services.auth_service import AuthService
+from app.services.audit_service import audit_log_service
+from app.api.v1.audit_router import audit_log_router, audit_router, login_history_router, user_audit_router
+from app.api.v1.ai_analytics_router import ai_analytics_router, ai_chat_history_router, user_chat_history_router
 
 
 @asynccontextmanager
@@ -81,6 +90,43 @@ app.include_router(
     prefix="/admission-applications",
     tags=["Admission Applications"],
 )
+
+
+@app.middleware("http")
+async def audit_business_actions(request, call_next):
+    response = await call_next(request)
+    if response.status_code >= 400 or request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return response
+    if request.url.path.startswith(("/login", "/logout", "/audit", "/login-history", "/audit-logs")):
+        return response
+    authorization = request.headers.get("authorization", "")
+    if not authorization.lower().startswith("bearer "):
+        return response
+    payload = AuthService.verify_token(authorization.split(" ", 1)[1])
+    try:
+        user_id = UUID(payload["sub"]) if payload else None
+    except (KeyError, ValueError, TypeError):
+        user_id = None
+    if user_id is None:
+        return response
+    activity = {"POST": "Create Record", "PUT": "Update Record", "PATCH": "Update Record", "DELETE": "Delete Record"}[request.method]
+    path = request.url.path.lower()
+    if "approve" in path and "leave" in path: activity = "Approve Leave"
+    elif "reject" in path and "leave" in path: activity = "Reject Leave"
+    elif path.startswith("/payments") and request.method == "POST": activity = "Fee Payment"
+    elif "issue" in path and "book" in path and request.method == "POST": activity = "Book Issue"
+    elif "return" in path and "book" in path: activity = "Book Return"
+    elif "approve" in path and "admission" in path: activity = "Admission Approval"
+    try:
+        async with AsyncSessionLocal() as audit_session:
+            await audit_log_service.create_log(audit_session, {
+                "user_id": user_id, "activity": activity,
+                "details": f"{request.method} {request.url.path}",
+            })
+    except Exception:
+        # Auditing must never turn a completed business action into a failed response.
+        pass
+    return response
 app.include_router(
     admission_document_router,
     prefix="/admission-documents",
@@ -89,8 +135,27 @@ app.include_router(
 app.include_router(leave_type_router, prefix="/leave-types", tags=["Leave Types"])
 app.include_router(leave_request_router, prefix="/leave-requests", tags=["Leave Requests"])
 app.include_router(user_leave_router, prefix="/users", tags=["User Leave Requests"])
+app.include_router(event_router, prefix="/events", tags=["Events"])
+app.include_router(academic_calendar_router, prefix="/academic-calendar", tags=["Academic Calendar"])
+app.include_router(book_category_router, prefix="/book-categories", tags=["Book Categories"])
+app.include_router(book_router, prefix="/books", tags=["Books"])
+app.include_router(book_issue_router, prefix="/book-issues", tags=["Book Issues"])
+app.include_router(student_library_router, prefix="/students", tags=["Student Library"])
+app.include_router(library_router, prefix="/library", tags=["Library"])
+app.include_router(bus_router, prefix="/buses", tags=["Buses"])
+app.include_router(route_router, prefix="/routes", tags=["Routes"])
+app.include_router(student_transport_router, prefix="/student-transport", tags=["Student Transport"])
+app.include_router(student_transport_detail_router, prefix="/students", tags=["Student Transport"])
+app.include_router(transport_router, prefix="/transport", tags=["Transport"])
 app.include_router(user_router, tags=["Users"])
 app.include_router(auth_router, tags=["auth"])
+app.include_router(login_history_router, prefix="/login-history", tags=["Login History"])
+app.include_router(audit_log_router, prefix="/audit-logs", tags=["Audit Logs"])
+app.include_router(audit_router, prefix="/audit", tags=["Audit & Security"])
+app.include_router(user_audit_router, prefix="/users", tags=["User Activity"])
+app.include_router(ai_analytics_router, prefix="/ai-analytics", tags=["AI Analytics"])
+app.include_router(ai_chat_history_router, prefix="/ai-chat-history", tags=["AI Chat History"])
+app.include_router(user_chat_history_router, prefix="/users", tags=["User Chat History"])
 
 
 @app.get("/health")
