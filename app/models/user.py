@@ -10,6 +10,8 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.attendance_model import Attendance
+    from app.models.audit_model import AuditLog, LoginHistory
+    from app.models.ai_analytics_model import AIChatHistory
     from app.models.admin_model import Admin
     from app.models.parent_model import Parent
     from app.models.role import Role
@@ -54,6 +56,7 @@ class User(Base):
     notifications = relationship("Notification", back_populates="user")
     sent_messages = relationship("Message", back_populates="sender", foreign_keys="Message.sender_id")
     received_messages = relationship("Message", back_populates="receiver", foreign_keys="Message.receiver_id")
+    events_created = relationship("Event", back_populates="creator", foreign_keys="Event.created_by")
     verified_documents = relationship(
         "AdmissionDocument",
         back_populates="verifier",
@@ -69,6 +72,15 @@ class User(Base):
         "LeaveRequest",
         back_populates="approver",
         foreign_keys="LeaveRequest.approved_by",
+    )
+    login_history: Mapped[list["LoginHistory"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    audit_logs: Mapped[list["AuditLog"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    ai_chat_history: Mapped[list["AIChatHistory"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
     )
 
     @property

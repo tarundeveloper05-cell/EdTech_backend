@@ -1,7 +1,7 @@
 from datetime import timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +11,7 @@ from app.services.role_resolver import resolve_role
 from app.services.auth_service import AuthService
 from app.schemas.user import UserCreate, UserCreateResponse, UserResponse
 from app.models.user import User
+from app.services.audit_service import audit_log_service, login_history_service
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
@@ -94,6 +95,7 @@ async def register(
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
+    request: Request = None,
 ) -> dict:
     result = await db.execute(select(User).where(User.email == form_data.username))
     user = result.scalar_one_or_none()
@@ -113,12 +115,40 @@ async def login(
             detail="Inactive user",
         )
 
+    login_record = await login_history_service.create_login_record(db, {
+        "user_id": user.id,
+        "device": request.headers.get("user-agent") if request else None,
+        "ip_address": request.client.host if request and request.client else None,
+    }, commit=False)
+    await audit_log_service.create_log(db, {
+        "user_id": user.id, "activity": "User Login", "details": "Successful login"
+    }, commit=False)
+    await db.commit()
+
     access_token = AuthService.create_access_token(
-        data={"sub": str(user.id)},
+        data={"sub": str(user.id), "sid": str(login_record.id)},
         expires_delta=timedelta(minutes=AuthService.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/logout")
+async def logout(
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    payload = AuthService.verify_token(token) or {}
+    session_id = payload.get("sid")
+    if session_id:
+        try:
+            await login_history_service.update_logout_record(db, UUID(session_id), commit=False)
+        except (ValueError, HTTPException):
+            pass
+    await audit_log_service.create_log(db, {"user_id": current_user.id, "activity": "User Logout", "details": "User logged out"}, commit=False)
+    await db.commit()
+    return {"message": "Logged out successfully"}
 
 
 @router.get("/me", response_model=UserResponse)
