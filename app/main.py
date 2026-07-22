@@ -37,6 +37,8 @@ from app.services.auth_service import AuthService
 from app.services.audit_service import audit_log_service
 from app.api.v1.audit_router import audit_log_router, audit_router, login_history_router, user_audit_router
 from app.api.v1.ai_analytics_router import ai_analytics_router, ai_chat_history_router, user_chat_history_router
+from app.api.v1.hostel_router import allocation_router, bed_router, block_router, hostel_router, room_router, student_hostel_router
+from app.api.v1.hostel_operations_router import visitor_router, fee_structure_router as hostel_fee_structure_router, fee_invoice_router as hostel_fee_invoice_router, hostel_payment_router, mess_menu_router, mess_expense_router, mess_collection_router, mess_attendance_router, maintenance_router, work_order_router, student_hostel_extra_router, hostel_extra_router
 
 
 @asynccontextmanager
@@ -156,6 +158,24 @@ app.include_router(user_audit_router, prefix="/users", tags=["User Activity"])
 app.include_router(ai_analytics_router, prefix="/ai-analytics", tags=["AI Analytics"])
 app.include_router(ai_chat_history_router, prefix="/ai-chat-history", tags=["AI Chat History"])
 app.include_router(user_chat_history_router, prefix="/users", tags=["User Chat History"])
+app.include_router(block_router, prefix="/hostel-blocks", tags=["Hostel Blocks"])
+app.include_router(room_router, prefix="/hostel-rooms", tags=["Hostel Rooms"])
+app.include_router(bed_router, prefix="/hostel-beds", tags=["Hostel Beds"])
+app.include_router(allocation_router, prefix="/hostel-allocations", tags=["Hostel Allocations"])
+app.include_router(student_hostel_router, prefix="/students", tags=["Student Hostel"])
+app.include_router(hostel_router, prefix="/hostel", tags=["Hostel"])
+app.include_router(visitor_router, prefix="/hostel-visitors", tags=["Hostel Visitors"])
+app.include_router(hostel_fee_structure_router, prefix="/hostel-fee-structures", tags=["Hostel Fee Structures"])
+app.include_router(hostel_fee_invoice_router, prefix="/hostel-fee-invoices", tags=["Hostel Fee Invoices"])
+app.include_router(hostel_payment_router, prefix="/hostel-payments", tags=["Hostel Payments"])
+app.include_router(mess_menu_router, prefix="/mess-menu", tags=["Mess Menu"])
+app.include_router(mess_expense_router, prefix="/mess-expenses", tags=["Mess Expenses"])
+app.include_router(mess_collection_router, prefix="/mess-collections", tags=["Mess Collections"])
+app.include_router(mess_attendance_router, prefix="/mess-attendance", tags=["Mess Attendance"])
+app.include_router(maintenance_router, prefix="/maintenance-requests", tags=["Maintenance Requests"])
+app.include_router(work_order_router, prefix="/work-orders", tags=["Work Orders"])
+app.include_router(student_hostel_extra_router, prefix="/students", tags=["Student Hostel"])
+app.include_router(hostel_extra_router, prefix="/hostel", tags=["Hostel"])
 
 
 @app.get("/health")

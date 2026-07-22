@@ -1,0 +1,13 @@
+from app.repositories.crud_repository import CRUDRepository
+from app.models.hostel_operations_model import *
+class HostelVisitorRepository(CRUDRepository[HostelVisitor]): pass
+class HostelFeeStructureRepository(CRUDRepository[HostelFeeStructure]): pass
+class HostelFeeInvoiceRepository(CRUDRepository[HostelFeeInvoice]): pass
+class HostelPaymentRepository(CRUDRepository[HostelPayment]): pass
+class MessMenuRepository(CRUDRepository[MessMenu]): pass
+class MessExpenseRepository(CRUDRepository[MessExpense]): pass
+class MessCollectionRepository(CRUDRepository[MessCollection]): pass
+class MessAttendanceRepository(CRUDRepository[MessAttendance]): pass
+class MaintenanceRequestRepository(CRUDRepository[MaintenanceRequest]): pass
+class WorkOrderRepository(CRUDRepository[WorkOrder]): pass
+visitor_repository=HostelVisitorRepository(HostelVisitor); hostel_fee_structure_repository=HostelFeeStructureRepository(HostelFeeStructure); hostel_fee_invoice_repository=HostelFeeInvoiceRepository(HostelFeeInvoice); hostel_payment_repository=HostelPaymentRepository(HostelPayment); mess_menu_repository=MessMenuRepository(MessMenu); mess_expense_repository=MessExpenseRepository(MessExpense); mess_collection_repository=MessCollectionRepository(MessCollection); mess_attendance_repository=MessAttendanceRepository(MessAttendance); maintenance_request_repository=MaintenanceRequestRepository(MaintenanceRequest); work_order_repository=WorkOrderRepository(WorkOrder)

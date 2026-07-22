@@ -55,3 +55,6 @@ class Student(Base):
     book_issues = relationship("BookIssue", back_populates="student")
     student_transport = relationship("StudentTransport", back_populates="student", uselist=False)
     ai_analytics = relationship("AIAnalytics", back_populates="student", cascade="all, delete-orphan")
+    hostel_allocations = relationship("HostelAllocation", back_populates="student")
+    hostel_visitors = relationship("HostelVisitor", back_populates="student")
+    hostel_fee_invoices = relationship("HostelFeeInvoice", back_populates="student")

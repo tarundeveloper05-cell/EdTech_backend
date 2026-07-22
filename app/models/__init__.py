@@ -31,6 +31,8 @@ from .library_model import Book, BookCategory, BookIssue, BookIssueStatus
 from .transport_model import Bus, Route, StudentTransport
 from .audit_model import AuditLog, LoginHistory
 from .ai_analytics_model import AIAnalytics, AIChatHistory
+from .hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelBlockStatus, HostelRoom, HostelRoomStatus
+from .hostel_operations_model import HostelVisitor, HostelFeeStructure, HostelFeeInvoice, HostelPayment, MessMenu, MessExpense, MessCollection, MessAttendance, MaintenanceRequest, WorkOrder
 
 Faculty = Teacher
 StudentParent = ParentStudent
