@@ -82,6 +82,8 @@ class User(Base):
     ai_chat_history: Mapped[list["AIChatHistory"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    hostel_blocks = relationship("HostelBlock", back_populates="warden", foreign_keys="HostelBlock.warden_id")
+    approved_hostel_visitors = relationship("HostelVisitor", back_populates="approver", foreign_keys="HostelVisitor.approved_by")
 
     @property
     def is_active(self) -> bool:
