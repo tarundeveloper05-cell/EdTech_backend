@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.dashboard_router import router as dashboard_router
 from app.api.v1.admin_router import router as admin_router
 from app.api.v1.admission_router import (
     application_router as admission_application_router,
@@ -25,20 +26,39 @@ from app.api.v1.timetable_router import router as timetable_router
 from app.api.v1.report_card_router import router as report_card_router
 from app.api.v1.users.routes import router as user_router
 from app.api.v1.assignment_router import router as assignment_router, submission_router, teacher_assignment_router, class_assignment_router, student_assignment_router
-from app.api.v1.communication_router import announcement_router, notification_router, message_router, user_communication_router
-from app.api.v1.fee_router import fee_structure_router, fee_invoice_router, payment_router, student_fee_router
+from app.api.v1.communication_router import announcement_router, notification_router, message_router, user_communication_router, teacher_communication_router
+from app.api.v1.fee_router import fee_structure_router, fee_invoice_router, payment_router, student_fee_router, accountant_fee_router
 from app.api.v1.leave_router import leave_request_router, leave_type_router, user_leave_router
 from app.api.v1.event_router import academic_calendar_router, event_router
-from app.api.v1.library_router import book_category_router, book_issue_router, book_router, library_router, student_library_router
+from app.api.v1.library_router import (
+    author_router,
+    book_category_router,
+    book_issue_router,
+    book_router,
+    fine_payment_router,
+    library_report_router,
+    library_router,
+    library_settings_router,
+    publisher_router,
+    reservation_router,
+    student_library_router,
+)
 from app.api.v1.transport_router import bus_router, route_router, student_transport_detail_router, student_transport_router, transport_router
-from .api.v1.auth.routes import router as auth_router
+from app.api.v1.auth.routes import router as auth_router
 from app.core.database import AsyncSessionLocal
+from app.core.exceptions import register_exception_handlers
+from app.core.rate_limit import RateLimitMiddleware
 from app.services.auth_service import AuthService
 from app.services.audit_service import audit_log_service
+from app.api.v1.finance_router import finance_router
 from app.api.v1.audit_router import audit_log_router, audit_router, login_history_router, user_audit_router
 from app.api.v1.ai_analytics_router import ai_analytics_router, ai_chat_history_router, user_chat_history_router
 from app.api.v1.hostel_router import allocation_router, bed_router, block_router, hostel_router, room_router, student_hostel_router
 from app.api.v1.hostel_operations_router import visitor_router, fee_structure_router as hostel_fee_structure_router, fee_invoice_router as hostel_fee_invoice_router, hostel_payment_router, mess_menu_router, mess_expense_router, mess_collection_router, mess_attendance_router, maintenance_router, work_order_router, student_hostel_extra_router, hostel_extra_router
+from app.api.v1.hostel_complaint_router import hostel_complaint_router
+from app.api.v1.hostel_notice_router import hostel_notice_router
+from app.api.v1.hostel_setting_router import hostel_setting_router
+from app.api.v1.hostel_leave_router import hostel_leave_router
 
 
 @asynccontextmanager
@@ -52,6 +72,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+register_exception_handlers(app)
+
+app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -59,6 +83,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(admin_router, prefix="/admins", tags=["Admins"])
 app.include_router(department_router, prefix="/departments", tags=["Departments"])
 app.include_router(teacher_router, prefix="/teachers", tags=["Teachers"])
@@ -83,10 +108,12 @@ app.include_router(announcement_router, prefix="/announcements", tags=["Announce
 app.include_router(notification_router, prefix="/notifications", tags=["Notifications"])
 app.include_router(message_router, prefix="/messages", tags=["Messages"])
 app.include_router(user_communication_router, prefix="/users", tags=["User Communication"])
+app.include_router(teacher_communication_router, prefix="/teachers", tags=["Teacher Communication"])
 app.include_router(fee_structure_router, prefix="/fee-structures", tags=["Fee Structures"])
 app.include_router(fee_invoice_router, prefix="/fee-invoices", tags=["Fee Invoices"])
 app.include_router(payment_router, prefix="/payments", tags=["Payments"])
 app.include_router(student_fee_router, prefix="/students", tags=["Student Fees"])
+app.include_router(accountant_fee_router, prefix="/fees", tags=["Accountant Fees"])
 app.include_router(
     admission_application_router,
     prefix="/admission-applications",
@@ -118,6 +145,10 @@ async def audit_business_actions(request, call_next):
     elif path.startswith("/payments") and request.method == "POST": activity = "Fee Payment"
     elif "issue" in path and "book" in path and request.method == "POST": activity = "Book Issue"
     elif "return" in path and "book" in path: activity = "Book Return"
+    elif "reservation" in path and "library" in path and request.method == "POST": activity = "Reservation Created"
+    elif "approve" in path and "reservation" in path: activity = "Reservation Approved"
+    elif "reject" in path and "reservation" in path: activity = "Reservation Rejected"
+    elif "pay-fine" in path: activity = "Fine Payment"
     elif "approve" in path and "admission" in path: activity = "Admission Approval"
     try:
         async with AsyncSessionLocal() as audit_session:
@@ -144,13 +175,20 @@ app.include_router(book_router, prefix="/books", tags=["Books"])
 app.include_router(book_issue_router, prefix="/book-issues", tags=["Book Issues"])
 app.include_router(student_library_router, prefix="/students", tags=["Student Library"])
 app.include_router(library_router, prefix="/library", tags=["Library"])
+app.include_router(author_router, prefix="/library/authors", tags=["Library Authors"])
+app.include_router(publisher_router, prefix="/library/publishers", tags=["Library Publishers"])
+app.include_router(reservation_router, prefix="/library/reservations", tags=["Library Reservations"])
+app.include_router(fine_payment_router, prefix="/library/fine-payments", tags=["Library Fine Payments"])
+app.include_router(library_settings_router, prefix="/library/settings", tags=["Library Settings"])
+app.include_router(library_report_router, prefix="/library/reports", tags=["Library Reports"])
 app.include_router(bus_router, prefix="/buses", tags=["Buses"])
 app.include_router(route_router, prefix="/routes", tags=["Routes"])
 app.include_router(student_transport_router, prefix="/student-transport", tags=["Student Transport"])
 app.include_router(student_transport_detail_router, prefix="/students", tags=["Student Transport"])
 app.include_router(transport_router, prefix="/transport", tags=["Transport"])
+app.include_router(finance_router, prefix="/finance", tags=["Finance"])
 app.include_router(user_router, tags=["Users"])
-app.include_router(auth_router, tags=["auth"])
+app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(login_history_router, prefix="/login-history", tags=["Login History"])
 app.include_router(audit_log_router, prefix="/audit-logs", tags=["Audit Logs"])
 app.include_router(audit_router, prefix="/audit", tags=["Audit & Security"])
@@ -176,6 +214,10 @@ app.include_router(maintenance_router, prefix="/maintenance-requests", tags=["Ma
 app.include_router(work_order_router, prefix="/work-orders", tags=["Work Orders"])
 app.include_router(student_hostel_extra_router, prefix="/students", tags=["Student Hostel"])
 app.include_router(hostel_extra_router, prefix="/hostel", tags=["Hostel"])
+app.include_router(hostel_complaint_router, prefix="/hostel-complaints", tags=["Hostel Complaints"])
+app.include_router(hostel_notice_router, prefix="/hostel-notices", tags=["Hostel Notices"])
+app.include_router(hostel_setting_router, prefix="/hostel-settings", tags=["Hostel Settings"])
+app.include_router(hostel_leave_router, prefix="/hostel-leave-requests", tags=["Hostel Leave Requests"])
 
 
 @app.get("/health")

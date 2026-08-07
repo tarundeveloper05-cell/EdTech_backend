@@ -19,6 +19,7 @@ class Bus(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     student_transports: Mapped[list["StudentTransport"]] = relationship("StudentTransport", back_populates="bus")
+    drivers: Mapped[list["Driver"]] = relationship("Driver", back_populates="bus", cascade="all, delete-orphan")
 
 
 class Route(Base):
@@ -48,3 +49,23 @@ class StudentTransport(Base):
     student: Mapped["Student"] = relationship("Student", back_populates="student_transport", lazy="selectin")
     bus: Mapped[Bus] = relationship("Bus", back_populates="student_transports", lazy="selectin")
     route: Mapped[Route] = relationship("Route", back_populates="student_transports", lazy="selectin")
+
+
+class Driver(Base):
+    __tablename__ = "drivers"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    driver_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    license_number: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    experience: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bus_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("buses.id"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    bus: Mapped["Bus | None"] = relationship("Bus", back_populates="drivers", lazy="selectin")

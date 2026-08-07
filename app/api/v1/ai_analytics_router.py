@@ -14,13 +14,24 @@ ai_chat_history_router = APIRouter()
 user_chat_history_router = APIRouter()
 
 
+def _ensure_admin(current_user: User) -> None:
+    if current_user.role.role_name != "ADMIN":
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin users can perform this action",
+        )
+
+
 @ai_analytics_router.post("/generate-all", response_model=list[AIAnalyticsResponse], status_code=status.HTTP_201_CREATED)
-async def generate_all(session: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+async def generate_all(session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await ai_analytics_service.generate_all_student_analytics(session)
 
 
 @ai_analytics_router.post("/generate/{student_id}", response_model=AIAnalyticsResponse, status_code=status.HTTP_201_CREATED)
-async def generate_student(student_id: UUID, session: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+async def generate_student(student_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     return await ai_analytics_service.generate_student_analytics(session, student_id)
 
 
@@ -45,7 +56,8 @@ async def get_analytics(analytics_id: UUID, session: AsyncSession = Depends(get_
 
 
 @ai_analytics_router.delete("/{analytics_id}")
-async def delete_analytics(analytics_id: UUID, session: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+async def delete_analytics(analytics_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     await ai_analytics_service.delete_analytics(session, analytics_id)
     return {"message": "Deleted successfully"}
 
@@ -66,7 +78,8 @@ async def get_chat_history(chat_id: UUID, session: AsyncSession = Depends(get_db
 
 
 @ai_chat_history_router.delete("/{chat_id}")
-async def delete_chat_history(chat_id: UUID, session: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
+async def delete_chat_history(chat_id: UUID, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _ensure_admin(current_user)
     await ai_chat_history_service.delete_chat(session, chat_id)
     return {"message": "Deleted successfully"}
 

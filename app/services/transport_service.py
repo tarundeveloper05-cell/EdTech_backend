@@ -1,10 +1,17 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.student_model import Student
-from app.repositories.transport_repository import bus_repository, route_repository, student_transport_repository
+from app.models.transport_model import Bus, Route, StudentTransport, Driver
+from app.repositories.transport_repository import (
+    bus_repository,
+    driver_repository,
+    route_repository,
+    student_transport_repository,
+)
 from app.services.crud_service import CRUDService
 
 
@@ -91,3 +98,52 @@ class StudentTransportService(CRUDService):
 bus_service = BusService(bus_repository, "Bus", ("bus_number",))
 route_service = RouteService(route_repository, "Route", ("route_name",))
 student_transport_service = StudentTransportService(student_transport_repository, "Student transport")
+
+
+class DriverService(CRUDService):
+    async def get_by_bus(self, session, bus_id):
+        return await driver_repository.get_by_bus(session, bus_id)
+
+    async def count_by_bus(self, session, bus_id):
+        return await driver_repository.count_by_bus(session, bus_id)
+
+
+driver_service = DriverService(driver_repository, "Driver", ("license_number",))
+
+
+async def transport_summary(session: AsyncSession) -> dict:
+    total_buses = await session.scalar(select(func.coalesce(func.count(Bus.id), 0)))
+    total_routes = await session.scalar(select(func.coalesce(func.count(Route.id), 0)))
+    students_using_transport = await session.scalar(select(func.coalesce(func.count(StudentTransport.id), 0)))
+    total_drivers = await session.scalar(select(func.coalesce(func.count(Driver.id), 0)))
+    assigned_drivers = await session.scalar(select(func.count(Driver.id)).where(Driver.bus_id.isnot(None)))
+    total_capacity = await session.scalar(select(func.coalesce(func.sum(Bus.capacity), 0)))
+    available_seats = total_capacity - students_using_transport
+    return {
+        "total_buses": total_buses,
+        "total_routes": total_routes,
+        "students_using_transport": students_using_transport,
+        "total_drivers": total_drivers,
+        "assigned_drivers": assigned_drivers,
+        "available_seats": available_seats,
+        "total_capacity": total_capacity,
+    }
+
+
+async def transport_summary(session: AsyncSession) -> dict:
+    total_buses = await session.scalar(select(func.coalesce(func.count(Bus.id), 0)))
+    total_routes = await session.scalar(select(func.coalesce(func.count(Route.id), 0)))
+    students_using_transport = await session.scalar(select(func.coalesce(func.count(StudentTransport.id), 0)))
+    total_drivers = await session.scalar(select(func.coalesce(func.count(Driver.id), 0)))
+    assigned_drivers = await session.scalar(select(func.count(Driver.id)).where(Driver.bus_id.isnot(None)))
+    total_capacity = await session.scalar(select(func.coalesce(func.sum(Bus.capacity), 0)))
+    available_seats = total_capacity - students_using_transport
+    return {
+        "total_buses": total_buses,
+        "total_routes": total_routes,
+        "students_using_transport": students_using_transport,
+        "total_drivers": total_drivers,
+        "assigned_drivers": assigned_drivers,
+        "available_seats": available_seats,
+        "total_capacity": total_capacity,
+    }

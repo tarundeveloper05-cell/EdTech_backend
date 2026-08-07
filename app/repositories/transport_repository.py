@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.transport_model import Bus, Route, StudentTransport
+from app.models.transport_model import Bus, Driver, Route, StudentTransport
 from app.repositories.crud_repository import CRUDRepository
 
 
@@ -36,6 +36,16 @@ class StudentTransportRepository(CRUDRepository[StudentTransport]):
         return await session.scalar(query) or 0
 
 
+class DriverRepository(CRUDRepository[Driver]):
+    async def get_by_id(self, session: AsyncSession, item_id: UUID): return await self.get(session, item_id)
+    async def get_all(self, session: AsyncSession): return await self.list(session)
+    async def get_by_bus(self, session: AsyncSession, bus_id: UUID):
+        return list((await session.execute(select(Driver).where(Driver.bus_id == bus_id))).scalars().all())
+    async def count_by_bus(self, session: AsyncSession, bus_id: UUID):
+        return await session.scalar(select(func.count(Driver.id)).where(Driver.bus_id == bus_id)) or 0
+
+
 bus_repository = BusRepository(Bus)
 route_repository = RouteRepository(Route)
 student_transport_repository = StudentTransportRepository(StudentTransport)
+driver_repository = DriverRepository(Driver)

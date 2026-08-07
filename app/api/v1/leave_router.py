@@ -23,10 +23,30 @@ leave_request_router = APIRouter()
 user_leave_router = APIRouter()
 
 
+def _ensure_admin(current_user: User) -> None:
+    if current_user.role.role_name != "ADMIN":
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin users can perform this action",
+        )
+
+
+def _ensure_admin_or_teacher(current_user: User) -> None:
+    if current_user.role.role_name not in ("ADMIN", "TEACHER"):
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin or teacher users can perform this action",
+        )
+
+
 @leave_type_router.post("", response_model=LeaveTypeResponse, status_code=status.HTTP_201_CREATED)
 async def create_leave_type(
-    payload: LeaveTypeCreate, session: AsyncSession = Depends(get_db)
+    payload: LeaveTypeCreate, session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_admin(current_user)
     return await leave_type_service.create_leave_type(session, payload.model_dump())
 
 
@@ -45,7 +65,9 @@ async def update_leave_type(
     leave_type_id: UUID,
     payload: LeaveTypeUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_admin(current_user)
     return await leave_type_service.update_leave_type(
         session, leave_type_id, payload.model_dump(exclude_unset=True)
     )
@@ -53,8 +75,10 @@ async def update_leave_type(
 
 @leave_type_router.delete("/{leave_type_id}", status_code=status.HTTP_200_OK)
 async def delete_leave_type(
-    leave_type_id: UUID, session: AsyncSession = Depends(get_db)
+    leave_type_id: UUID, session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_admin(current_user)
     await leave_type_service.delete_leave_type(session, leave_type_id)
     return {"message": "Deleted successfully"}
 
@@ -63,7 +87,8 @@ async def delete_leave_type(
     "", response_model=LeaveRequestResponse, status_code=status.HTTP_201_CREATED
 )
 async def apply_leave(
-    payload: LeaveRequestCreate, session: AsyncSession = Depends(get_db)
+    payload: LeaveRequestCreate, session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     return await leave_request_service.apply_leave(session, payload.model_dump())
 
@@ -90,6 +115,7 @@ async def approve_leave(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_admin_or_teacher(current_user)
     return await leave_request_service.approve_leave(session, leave_id, current_user)
 
 
@@ -100,11 +126,14 @@ async def reject_leave(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _ensure_admin_or_teacher(current_user)
     return await leave_request_service.reject_leave(session, leave_id, current_user)
 
 
 @leave_request_router.patch("/{leave_id}/cancel", response_model=LeaveRequestResponse)
-async def cancel_leave(leave_id: UUID, session: AsyncSession = Depends(get_db)):
+async def cancel_leave(leave_id: UUID, session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     return await leave_request_service.cancel_leave(session, leave_id)
 
 
@@ -118,20 +147,29 @@ async def update_leave(
     leave_id: UUID,
     payload: LeaveRequestUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_admin_or_teacher(current_user)
     return await leave_request_service.update_leave(
         session, leave_id, payload.model_dump(exclude_unset=True)
     )
 
 
 @leave_request_router.delete("/{leave_id}", status_code=status.HTTP_200_OK)
-async def delete_leave(leave_id: UUID, session: AsyncSession = Depends(get_db)):
+async def delete_leave(
+    leave_id: UUID, session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_teacher(current_user)
     await leave_request_service.delete_leave(session, leave_id)
     return {"message": "Deleted successfully"}
 
 
 @user_leave_router.get("/{user_id}/leave-requests", response_model=list[LeaveRequestResponse])
 async def get_user_leave_requests(
-    user_id: UUID, session: AsyncSession = Depends(get_db)
+    user_id: UUID, session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    if current_user.role.role_name not in ("ADMIN", "TEACHER") and str(current_user.id) != str(user_id):
+        _ensure_admin_or_teacher(current_user)
     return await leave_request_service.get_user_leaves(session, user_id)

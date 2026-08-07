@@ -1,0 +1,1201 @@
+from __future__ import annotations
+
+from datetime import date
+from uuid import UUID
+
+from fastapi import APIRouter, Body, Depends, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.v1.auth.routes import get_current_user
+from app.core.database import get_db
+from app.core.exceptions import APIException, success_response
+from app.models.fee_model import (
+    FeeInvoice,
+    FeeStructure,
+    Payment,
+)
+from app.models.finance_model import (
+    Expense,
+    ExpenseCategory,
+    LateFeeRule,
+    OtherIncome,
+    RefundRequest,
+    StudentCategory,
+    StudentFeeAssignment,
+    StudentLedger,
+    StudentScholarship,
+    ScholarshipType,
+)
+from app.models.user import User
+from app.repositories.fee_repository import fee_invoice_repository, payment_repository
+from app.repositories.finance_repository import (
+    expense_category_repository,
+    expense_repository,
+    fee_installment_repository,
+    late_fee_rule_repository,
+    other_income_repository,
+    refund_request_repository,
+    salary_repository,
+    student_category_repository,
+    student_fee_assignment_repository,
+    student_ledger_repository,
+    scholarship_type_repository,
+    student_scholarship_repository,
+)
+from app.schemas.fee_schema import (
+    FeeInvoiceCreate,
+    FeeInvoiceResponse,
+    FeeInvoiceUpdate,
+    FeeInstallmentCreate,
+    FeeInstallmentResponse,
+    FeeInstallmentUpdate,
+    FeeStructureCreate,
+    FeeStructureResponse,
+    FeeStructureUpdate,
+    FeeSummaryResponse,
+    PaymentCreate,
+    PaymentResponse,
+    PaymentUpdate,
+    StudentFeeAssignmentCreate,
+    StudentFeeAssignmentResponse,
+    StudentFeeAssignmentUpdate,
+    StudentLedgerResponse,
+    StudentLedgerSummaryResponse,
+)
+from app.schemas.finance_schema import (
+    AdminDashboardResponse,
+    ExpenseCategoryCreate,
+    ExpenseCategoryResponse,
+    ExpenseCategoryUpdate,
+    ExpenseCreate,
+    ExpenseResponse,
+    ExpenseUpdate,
+    FinanceOverviewResponse,
+    FinanceTransaction,
+    FinanceTransactionListResponse,
+    InvoiceResponse,
+    LateFeeRuleCreate,
+    LateFeeRuleResponse,
+    LateFeeRuleUpdate,
+    OtherIncomeCreate,
+    OtherIncomeResponse,
+    OtherIncomeUpdate,
+    ParentDashboardResponse,
+    ReceiptResponse,
+    RefundRequestCreate,
+    RefundRequestResponse,
+    RefundRequestUpdate,
+    ReportPaginationParams,
+    ScholarshipTypeCreate,
+    ScholarshipTypeResponse,
+    ScholarshipTypeUpdate,
+    StudentCategoryCreate,
+    StudentCategoryResponse,
+    StudentCategoryUpdate,
+    StudentDashboardResponse,
+    StudentScholarshipCreate,
+    StudentScholarshipResponse,
+    StudentScholarshipUpdate,
+)
+from app.services.fee_service import (
+    fee_invoice_service,
+    fee_structure_service,
+    payment_service,
+    refund_service,
+    student_scholarship_service,
+    late_fee_rule_service,
+)
+from app.services.finance_service import (
+    expense_category_service,
+    fee_installment_service,
+    finance_service,
+    other_income_service,
+    salary_service,
+    student_category_service,
+    student_ledger_service,
+    scholarship_type_service,
+    student_fee_assignment_service,
+)
+from app.repositories.finance_repository import (
+    student_fee_assignment_repository,
+    student_ledger_repository,
+)
+
+
+def _ensure_admin_or_accountant(current_user: User) -> None:
+    if current_user.role.role_name not in ("ADMIN", "ACCOUNTANT"):
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Only admin or accountant users can perform this action",
+        )
+
+
+def _ensure_admin(current_user: User) -> None:
+    if current_user.role.role_name != "ADMIN":
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Only admin users can perform this action",
+        )
+
+
+finance_router = APIRouter()
+
+
+@finance_router.get("/overview", response_model=FinanceOverviewResponse)
+async def get_finance_overview(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_finance_overview(session)
+    return success_response(data)
+
+
+@finance_router.get("/transactions", response_model=FinanceTransactionListResponse)
+async def list_transactions(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await finance_service.get_transactions(session)
+    return success_response({"items": items, "total": len(items)})
+
+
+@finance_router.get("/expenses", response_model=list[ExpenseResponse])
+async def list_expenses(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await finance_service.get_expenses(session)
+    return success_response(items)
+
+
+@finance_router.post("/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
+async def create_expense(
+    payload: ExpenseCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await finance_service.create_expense(session, payload.model_dump())
+    return success_response(item, message="Expense created successfully")
+
+
+@finance_router.get("/expenses/{item_id}", response_model=ExpenseResponse)
+async def get_expense(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await finance_service.get_expense(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/expenses/{item_id}", response_model=ExpenseResponse)
+async def update_expense(
+    item_id: UUID,
+    payload: ExpenseUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await finance_service.get_expense(session, item_id)
+    from app.services.crud_service import CRUDService
+    crud = CRUDService(expense_repository, "Expense")
+    updated = await crud.update(session, item_id, payload.model_dump(exclude_unset=True))
+    await session.commit()
+    await session.refresh(updated)
+    return success_response(updated, message="Expense updated successfully")
+
+
+@finance_router.delete("/expenses/{item_id}")
+async def delete_expense(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await finance_service.get_expense(session, item_id)
+    from app.services.crud_service import CRUDService
+    crud = CRUDService(expense_repository, "Expense")
+    await crud.delete(session, item_id)
+    return success_response(message="Expense deleted successfully")
+
+
+@finance_router.get("/salary")
+async def list_salary_records(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    items = await finance_service.get_salaries(session)
+    return success_response(items)
+
+
+@finance_router.post("/salary", status_code=status.HTTP_201_CREATED)
+async def process_salary(
+    payload: SalaryCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await finance_service.create_salary(session, payload.model_dump())
+    return success_response(item, message="Salary processed successfully")
+
+
+# Fee structures
+@finance_router.get("/fee-structures", response_model=list[FeeStructureResponse])
+async def list_fee_structures(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await fee_structure_service.list(session)
+    return success_response(items)
+
+
+@finance_router.get("/fee-structures/{item_id}", response_model=FeeStructureResponse)
+async def get_fee_structure(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_structure_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.post("/fee-structures", response_model=FeeStructureResponse, status_code=status.HTTP_201_CREATED)
+async def create_fee_structure(
+    payload: FeeStructureCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_structure_service.create(session, payload.model_dump())
+    return success_response(item, message="Fee structure created successfully")
+
+
+@finance_router.put("/fee-structures/{item_id}", response_model=FeeStructureResponse)
+async def update_fee_structure(
+    item_id: UUID,
+    payload: FeeStructureUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_structure_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Fee structure updated successfully")
+
+
+@finance_router.delete("/fee-structures/{item_id}")
+async def delete_fee_structure(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    await fee_structure_service.delete(session, item_id)
+    return success_response(message="Fee structure deleted successfully")
+
+
+# Invoices
+@finance_router.get("/invoices", response_model=list[FeeInvoiceResponse])
+async def list_invoices(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await fee_invoice_service.list(session)
+    return success_response(items)
+
+
+@finance_router.get("/invoices/{item_id}", response_model=FeeInvoiceResponse)
+async def get_invoice(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_invoice_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.post("/invoices/generate", response_model=FeeInvoiceResponse, status_code=status.HTTP_201_CREATED)
+async def generate_invoice(
+    payload: FeeInvoiceCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_invoice_service.create(session, payload.model_dump())
+    return success_response(item, message="Invoice generated successfully")
+
+
+# Student Categories
+@finance_router.get("/student-categories", response_model=list[StudentCategoryResponse])
+async def list_student_categories(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await student_category_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/student-categories", response_model=StudentCategoryResponse, status_code=status.HTTP_201_CREATED)
+async def create_student_category(
+    payload: StudentCategoryCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await student_category_service.create(session, payload.model_dump())
+    return success_response(item, message="Student category created successfully")
+
+
+@finance_router.get("/student-categories/{item_id}", response_model=StudentCategoryResponse)
+async def get_student_category(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await student_category_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/student-categories/{item_id}", response_model=StudentCategoryResponse)
+async def update_student_category(
+    item_id: UUID,
+    payload: StudentCategoryUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await student_category_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Student category updated successfully")
+
+
+@finance_router.delete("/student-categories/{item_id}")
+async def delete_student_category(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    await student_category_service.delete(session, item_id)
+    return success_response(message="Student category deleted successfully")
+
+
+# Fee Installments
+@finance_router.get("/fee-installments", response_model=list[FeeInstallmentResponse])
+async def list_fee_installments(
+    fee_structure_id: UUID | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    if fee_structure_id is not None:
+        items = await fee_installment_repository.get_by_fee_structure(session, fee_structure_id)
+    else:
+        items = await fee_installment_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/fee-installments", response_model=FeeInstallmentResponse, status_code=status.HTTP_201_CREATED)
+async def create_fee_installment(
+    payload: FeeInstallmentCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_installment_service.create(session, payload.model_dump())
+    return success_response(item, message="Fee installment created successfully")
+
+
+@finance_router.get("/fee-installments/{item_id}", response_model=FeeInstallmentResponse)
+async def get_fee_installment(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await fee_installment_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/fee-installments/{item_id}", response_model=FeeInstallmentResponse)
+async def update_fee_installment(
+    item_id: UUID,
+    payload: FeeInstallmentUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await fee_installment_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Fee installment updated successfully")
+
+
+@finance_router.delete("/fee-installments/{item_id}")
+async def delete_fee_installment(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    await fee_installment_service.delete(session, item_id)
+    return success_response(message="Fee installment deleted successfully")
+
+
+# Student Fee Assignments
+@finance_router.get("/student-fee-assignments", response_model=list[StudentFeeAssignmentResponse])
+async def list_student_fee_assignments(
+    student_id: UUID | None = Query(None),
+    academic_year: str | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    if student_id is not None:
+        items = await student_fee_assignment_repository.get_by_student(session, student_id)
+    else:
+        items = await student_fee_assignment_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/student-fee-assignments", response_model=StudentFeeAssignmentResponse, status_code=status.HTTP_201_CREATED)
+async def create_student_fee_assignment(
+    payload: StudentFeeAssignmentCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await student_fee_assignment_service.create(session, payload.model_dump())
+    return success_response(item, message="Student fee assignment created successfully")
+
+
+@finance_router.get("/student-fee-assignments/{item_id}", response_model=StudentFeeAssignmentResponse)
+async def get_student_fee_assignment(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await student_fee_assignment_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/student-fee-assignments/{item_id}", response_model=StudentFeeAssignmentResponse)
+async def update_student_fee_assignment(
+    item_id: UUID,
+    payload: StudentFeeAssignmentUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await student_fee_assignment_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Student fee assignment updated successfully")
+
+
+@finance_router.delete("/student-fee-assignments/{item_id}")
+async def delete_student_fee_assignment(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    await student_fee_assignment_service.delete(session, item_id)
+    return success_response(message="Student fee assignment deleted successfully")
+
+
+@finance_router.post("/student-fee-assignments/bulk-assign")
+async def bulk_assign_fee(
+    payload: dict = Body(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    student_ids = payload.get("student_ids", [])
+    fee_structure_id = payload.get("fee_structure_id")
+    academic_year = payload.get("academic_year")
+    due_date = payload.get("due_date")
+    if not student_ids or not fee_structure_id:
+        raise APIException(status_code=status.HTTP_400_BAD_REQUEST, message="student_ids and fee_structure_id are required")
+    created = []
+    for sid in student_ids:
+        try:
+            invoices = await fee_invoice_service.assign_fee_to_student(
+                session, UUID(sid), {"fee_structure_id": UUID(fee_structure_id), "academic_year": academic_year, "due_date": due_date}
+            )
+            created.extend(invoices)
+        except Exception:
+            continue
+    return success_response({"created_count": len(created)}, message=f"Assigned fees to {len(created)} students")
+
+
+# Student Ledgers
+@finance_router.get("/ledgers/{student_id}", response_model=list[StudentLedgerResponse])
+async def get_student_ledger(
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await student_ledger_repository.get_by_student(session, student_id)
+    return success_response(items)
+
+
+@finance_router.get("/ledgers/{student_id}/summary", response_model=StudentLedgerSummaryResponse)
+async def get_student_ledger_summary(
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    summary = await student_ledger_repository.get_ledger_summary(session, student_id)
+    return success_response(summary)
+
+
+# Scholarships
+@finance_router.get("/scholarship-types", response_model=list[ScholarshipTypeResponse])
+async def list_scholarship_types(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await scholarship_type_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/scholarship-types", response_model=ScholarshipTypeResponse, status_code=status.HTTP_201_CREATED)
+async def create_scholarship_type(
+    payload: ScholarshipTypeCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await scholarship_type_service.create(session, payload.model_dump())
+    return success_response(item, message="Scholarship type created successfully")
+
+
+@finance_router.get("/scholarships", response_model=list[StudentScholarshipResponse])
+async def list_scholarships(
+    student_id: UUID | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    if student_id is not None:
+        items = await student_scholarship_repository.get_by_student(session, student_id)
+    else:
+        items = await student_scholarship_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/scholarships", response_model=StudentScholarshipResponse, status_code=status.HTTP_201_CREATED)
+async def create_scholarship(
+    payload: StudentScholarshipCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await student_scholarship_service.create(session, payload.model_dump())
+    return success_response(item, message="Scholarship assigned successfully")
+
+
+@finance_router.get("/scholarships/{item_id}", response_model=StudentScholarshipResponse)
+async def get_scholarship(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await student_scholarship_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/scholarships/{item_id}", response_model=StudentScholarshipResponse)
+async def update_scholarship(
+    item_id: UUID,
+    payload: StudentScholarshipUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await student_scholarship_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Scholarship updated successfully")
+
+
+@finance_router.post("/scholarships/{item_id}/approve", response_model=StudentScholarshipResponse)
+async def approve_scholarship(
+    item_id: UUID,
+    payload: dict = Body(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await student_scholarship_service.approve(session, item_id, {"approved_by": current_user.id, **payload})
+    return success_response(item, message="Scholarship approved successfully")
+
+
+@finance_router.post("/scholarships/{item_id}/reject", response_model=StudentScholarshipResponse)
+async def reject_scholarship(
+    item_id: UUID,
+    payload: dict = Body(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await student_scholarship_service.reject(session, item_id, payload)
+    return success_response(item, message="Scholarship rejected")
+
+
+# Late Fee Rules
+@finance_router.get("/late-fee-rules", response_model=list[LateFeeRuleResponse])
+async def list_late_fee_rules(
+    fee_structure_id: UUID | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    if fee_structure_id is not None:
+        items = await late_fee_rule_repository.get_by_fee_structure(session, fee_structure_id)
+    else:
+        items = await late_fee_rule_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/late-fee-rules", response_model=LateFeeRuleResponse, status_code=status.HTTP_201_CREATED)
+async def create_late_fee_rule(
+    payload: LateFeeRuleCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await late_fee_rule_service.create(session, payload.model_dump())
+    return success_response(item, message="Late fee rule created successfully")
+
+
+@finance_router.get("/late-fee-rules/{item_id}", response_model=LateFeeRuleResponse)
+async def get_late_fee_rule(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await late_fee_rule_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/late-fee-rules/{item_id}", response_model=LateFeeRuleResponse)
+async def update_late_fee_rule(
+    item_id: UUID,
+    payload: LateFeeRuleUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await late_fee_rule_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Late fee rule updated successfully")
+
+
+@finance_router.post("/late-fee-rules/apply")
+async def apply_late_fees(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    applied = await late_fee_rule_service.apply_late_fees(session)
+    return success_response({"applied_count": applied}, message=f"Applied late fees to {applied} invoices")
+
+
+# Refunds
+@finance_router.get("/refunds", response_model=list[RefundRequestResponse])
+async def list_refunds(
+    status: str | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    if status is not None:
+        items = await refund_request_repository.get_by_status(session, status)
+    else:
+        items = await refund_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/refunds", response_model=RefundRequestResponse, status_code=status.HTTP_201_CREATED)
+async def create_refund(
+    payload: RefundRequestCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await refund_service.create(session, payload.model_dump())
+    return success_response(item, message="Refund request created successfully")
+
+
+@finance_router.get("/refunds/{item_id}", response_model=RefundRequestResponse)
+async def get_refund(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await refund_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/refunds/{item_id}", response_model=RefundRequestResponse)
+async def update_refund(
+    item_id: UUID,
+    payload: RefundRequestUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await refund_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Refund updated successfully")
+
+
+@finance_router.post("/refunds/{item_id}/approve", response_model=RefundRequestResponse)
+async def approve_refund(
+    item_id: UUID,
+    payload: dict = Body(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await refund_service.approve(session, item_id, {"approved_by": current_user.id, **payload})
+    return success_response(item, message="Refund approved successfully")
+
+
+@finance_router.post("/refunds/{item_id}/process", response_model=RefundRequestResponse)
+async def process_refund(
+    item_id: UUID,
+    payload: dict = Body(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await refund_service.process_refund(session, item_id, payload)
+    return success_response(item, message="Refund processed successfully")
+
+
+@finance_router.post("/refunds/{item_id}/reject", response_model=RefundRequestResponse)
+async def reject_refund(
+    item_id: UUID,
+    payload: dict = Body(...),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await refund_service.reject(session, item_id, payload)
+    return success_response(item, message="Refund rejected")
+
+
+# Other Income
+@finance_router.get("/incomes", response_model=list[OtherIncomeResponse])
+async def list_incomes(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await other_income_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/incomes", response_model=OtherIncomeResponse, status_code=status.HTTP_201_CREATED)
+async def create_income(
+    payload: OtherIncomeCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await other_income_service.create(session, payload.model_dump())
+    return success_response(item, message="Income recorded successfully")
+
+
+@finance_router.get("/incomes/{item_id}", response_model=OtherIncomeResponse)
+async def get_income(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await other_income_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/incomes/{item_id}", response_model=OtherIncomeResponse)
+async def update_income(
+    item_id: UUID,
+    payload: OtherIncomeUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await other_income_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Income updated successfully")
+
+
+@finance_router.delete("/incomes/{item_id}")
+async def delete_income(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    await other_income_service.delete(session, item_id)
+    return success_response(message="Income deleted successfully")
+
+
+# Expense Categories
+@finance_router.get("/expense-categories", response_model=list[ExpenseCategoryResponse])
+async def list_expense_categories(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await expense_category_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/expense-categories", response_model=ExpenseCategoryResponse, status_code=status.HTTP_201_CREATED)
+async def create_expense_category(
+    payload: ExpenseCategoryCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await expense_category_service.create(session, payload.model_dump())
+    return success_response(item, message="Expense category created successfully")
+
+
+@finance_router.get("/expense-categories/{item_id}", response_model=ExpenseCategoryResponse)
+async def get_expense_category(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = await expense_category_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/expense-categories/{item_id}", response_model=ExpenseCategoryResponse)
+async def update_expense_category(
+    item_id: UUID,
+    payload: ExpenseCategoryUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    item = await expense_category_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Expense category updated successfully")
+
+
+@finance_router.delete("/expense-categories/{item_id}")
+async def delete_expense_category(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    await expense_category_service.delete(session, item_id)
+    return success_response(message="Expense category deleted successfully")
+
+
+# Reports
+@finance_router.get("/reports/daily-collection")
+async def report_daily_collection(
+    date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_daily_collection(session, date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/monthly-collection")
+async def report_monthly_collection(
+    year: int | None = Query(None),
+    month: int | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_monthly_collection(session, year, month)
+    return success_response(data)
+
+
+@finance_router.get("/reports/yearly-collection")
+async def report_yearly_collection(
+    year: int | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_yearly_collection(session, year)
+    return success_response(data)
+
+
+@finance_router.get("/reports/outstanding-fees")
+async def report_outstanding_fees(
+    class_id: UUID | None = Query(None),
+    section: str | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_outstanding_fees(session, class_id, section)
+    return success_response(data)
+
+
+@finance_router.get("/reports/student-ledger")
+async def report_student_ledger(
+    student_id: UUID | None = Query(None),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_student_ledger(session, student_id, start_date, end_date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/income-report")
+async def report_income(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_income(session, start_date, end_date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/expense-report")
+async def report_expense(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_expense(session, start_date, end_date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/profit-loss")
+async def report_profit_loss(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_profit_loss(session, start_date, end_date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/payment-mode")
+async def report_payment_mode(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_payment_mode(session, start_date, end_date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/class-wise-collection")
+async def report_class_wise(
+    academic_year: str | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_class_wise_collection(session, academic_year)
+    return success_response(data)
+
+
+@finance_router.get("/reports/section-wise-collection")
+async def report_section_wise(
+    academic_year: str | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_section_wise_collection(session, academic_year)
+    return success_response(data)
+
+
+@finance_router.get("/reports/transport-fee")
+async def report_transport_fee(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_transport_fee(session, start_date, end_date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/hostel-fee")
+async def report_hostel_fee(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_hostel_fee(session, start_date, end_date)
+    return success_response(data)
+
+
+@finance_router.get("/reports/library-fine")
+async def report_library_fine(
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    data = await finance_service.get_report_library_fine(session, start_date, end_date)
+    return success_response(data)
+
+
+# Receipts
+@finance_router.get("/receipts/{payment_id}", response_model=ReceiptResponse)
+async def get_receipt(
+    payment_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    data = await finance_service.generate_receipt(session, payment_id)
+    return success_response(data)
+
+
+@finance_router.get("/invoices/{invoice_id}/pdf", response_model=InvoiceResponse)
+async def get_invoice_pdf(
+    invoice_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    data = await finance_service.generate_invoice(session, invoice_id)
+    return success_response(data)
+
+
+# Dashboards
+@finance_router.get("/dashboard/admin", response_model=AdminDashboardResponse)
+async def get_admin_dashboard(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    data = await finance_service.get_admin_dashboard(session)
+    return success_response(data)
+
+
+@finance_router.get("/dashboard/student/{student_id}", response_model=StudentDashboardResponse)
+async def get_student_finance_dashboard(
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role.role_name not in ("ADMIN", "STUDENT"):
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Only admin or student users can access this dashboard",
+        )
+    if current_user.role.role_name == "STUDENT":
+        student = await session.execute(
+            select(Student).where(Student.user_id == current_user.id)
+        )
+        student_obj = student.scalar_one_or_none()
+        if student_obj is None or student_obj.id != student_id:
+            raise APIException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="You can only access your own dashboard",
+            )
+    data = await finance_service.get_student_dashboard(session, student_id)
+    return success_response(data)
+
+
+@finance_router.get("/dashboard/parent/{parent_id}", response_model=ParentDashboardResponse)
+async def get_parent_finance_dashboard(
+    parent_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role.role_name not in ("ADMIN", "PARENT"):
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            message="Only admin or parent users can access this dashboard",
+        )
+    if current_user.role.role_name == "PARENT":
+        if current_user.id != parent_id:
+            raise APIException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="You can only access your own dashboard",
+            )
+    data = await finance_service.get_parent_dashboard(session, parent_id)
+    return success_response(data)
+
+
+# Payments
+@finance_router.get("/payments", response_model=list[PaymentResponse])
+async def list_payments(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    items = await payment_service.list(session)
+    return success_response(items)
+
+
+@finance_router.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+async def create_payment(
+    payload: PaymentCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await payment_service.create(session, payload.model_dump())
+    return success_response(item, message="Payment recorded successfully")
+
+
+@finance_router.get("/payments/{item_id}", response_model=PaymentResponse)
+async def get_payment(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await payment_service.get(session, item_id)
+    return success_response(item)
+
+
+@finance_router.put("/payments/{item_id}", response_model=PaymentResponse)
+async def update_payment(
+    item_id: UUID,
+    payload: PaymentUpdate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    item = await payment_service.update(session, item_id, payload.model_dump(exclude_unset=True))
+    return success_response(item, message="Payment updated successfully")
+
+
+@finance_router.delete("/payments/{item_id}")
+async def delete_payment(
+    item_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin_or_accountant(current_user)
+    await payment_service.delete(session, item_id)
+    return success_response(message="Payment deleted successfully")

@@ -12,6 +12,7 @@ from app.repositories.admission_repository import (
     admission_application_repository,
     admission_document_repository,
 )
+from app.services.fee_service import fee_invoice_service, fee_structure_service
 
 
 class AdmissionApplicationService:
@@ -90,6 +91,22 @@ class AdmissionApplicationService:
         item = await admission_application_repository.update(
             session, item, {"status": AdmissionApplicationStatus.APPROVED}
         )
+        await session.flush()
+
+        try:
+            fee_structures = await fee_structure_service.list(session)
+            for fee_structure in fee_structures:
+                await fee_invoice_service.assign_fee_to_student(
+                    session,
+                    item.student_id,
+                    {
+                        "fee_structure_id": fee_structure.id,
+                        "academic_year": date.today().year,
+                    },
+                )
+        except Exception:
+            pass
+
         await session.commit()
         return item
 

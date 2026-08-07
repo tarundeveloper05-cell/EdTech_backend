@@ -84,6 +84,10 @@ class User(Base):
     )
     hostel_blocks = relationship("HostelBlock", back_populates="warden", foreign_keys="HostelBlock.warden_id")
     approved_hostel_visitors = relationship("HostelVisitor", back_populates="approver", foreign_keys="HostelVisitor.approved_by")
+    assigned_hostel_complaints = relationship("HostelComplaint", back_populates="assignee", foreign_keys="HostelComplaint.assigned_to")
+    resolved_hostel_complaints = relationship("HostelComplaint", back_populates="resolver", foreign_keys="HostelComplaint.resolved_by")
+    approved_hostel_leave_requests = relationship("HostelLeaveRequest", back_populates="approver", foreign_keys="HostelLeaveRequest.approved_by")
+    hostel_notices = relationship("HostelNotice", back_populates="publisher", foreign_keys="HostelNotice.published_by")
 
     @property
     def is_active(self) -> bool:

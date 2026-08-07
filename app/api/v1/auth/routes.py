@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -97,7 +97,11 @@ async def login(
     db: AsyncSession = Depends(get_db),
     request: Request = None,
 ) -> dict:
-    result = await db.execute(select(User).where(User.email == form_data.username))
+    result = await db.execute(
+        select(User).where(
+            or_(User.email == form_data.username, User.username == form_data.username)
+        )
+    )
     user = result.scalar_one_or_none()
 
     if user is None or not AuthService.verify_password(

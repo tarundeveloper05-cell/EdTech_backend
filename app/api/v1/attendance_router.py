@@ -4,7 +4,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
+from app.models.user import User
 from app.schemas.attendance_schema import (
     AttendanceCreate,
     AttendanceResponse,
@@ -21,17 +23,32 @@ from app.services.attendance_service import attendance_service
 router = APIRouter()
 
 
+def _ensure_teacher_or_admin(current_user: User) -> None:
+    if current_user.role.role_name not in ("ADMIN", "TEACHER"):
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin or teacher users can perform this action",
+        )
+
+
 @router.post("", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
 async def create_attendance(
-    payload: AttendanceCreate, session: AsyncSession = Depends(get_db)
+    payload: AttendanceCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_teacher_or_admin(current_user)
     return await attendance_service.create_attendance(session, payload.model_dump())
 
 
 @router.post("/bulk", response_model=list[AttendanceResponse], status_code=status.HTTP_201_CREATED)
 async def create_bulk_attendance(
-    payload: BulkAttendanceCreate, session: AsyncSession = Depends(get_db)
+    payload: BulkAttendanceCreate,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_teacher_or_admin(current_user)
     return await attendance_service.create_bulk_attendance(session, payload.model_dump())
 
 
@@ -119,7 +136,9 @@ async def update_attendance(
     attendance_id: UUID,
     payload: AttendanceUpdate,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_teacher_or_admin(current_user)
     return await attendance_service.update_attendance(
         session, attendance_id, payload.model_dump()
     )
@@ -127,7 +146,10 @@ async def update_attendance(
 
 @router.delete("/{attendance_id}", status_code=status.HTTP_200_OK)
 async def delete_attendance(
-    attendance_id: UUID, session: AsyncSession = Depends(get_db)
+    attendance_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    _ensure_teacher_or_admin(current_user)
     await attendance_service.delete_attendance(session, attendance_id)
     return {"message": "Deleted successfully"}

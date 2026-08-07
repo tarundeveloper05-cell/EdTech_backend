@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
-from app.models.hostel_operations_model import HostelInvoiceStatus, MaintenancePriority, MaintenanceStatus, MessAttendanceStatus, WorkOrderStatus
+from app.models.hostel_operations_model import HostelInvoiceStatus, MaintenancePriority, MaintenanceStatus, MessAttendanceStatus, WorkOrderStatus, ComplaintStatus, NoticeStatus, LeaveApprovalStatus, HostelSettingKey
 class _Response(BaseModel): model_config=ConfigDict(from_attributes=True); id: UUID; created_at: datetime; updated_at: datetime
 class HostelVisitorCreate(BaseModel): student_id: UUID; visitor_name: str=Field(min_length=1); relation: str|None=None; phone: str=Field(min_length=1); check_in_time: datetime; check_out_time: datetime|None=None; approved_by: UUID
 class HostelVisitorUpdate(BaseModel): visitor_name: str|None=Field(None,min_length=1); relation: str|None=None; phone: str|None=Field(None,min_length=1); check_in_time: datetime|None=None; check_out_time: datetime|None=None; approved_by: UUID|None=None
@@ -25,3 +25,17 @@ class MaintenanceRequestCreate(BaseModel): requested_by: UUID; room_id: UUID; is
 class MaintenanceRequestResponse(_Response): requested_by: UUID; room_id: UUID; issue_type: str; description: str; priority: MaintenancePriority; status: MaintenanceStatus; requested_on: datetime
 class WorkOrderCreate(BaseModel): request_id: UUID; assigned_to: UUID; scheduled_date: date
 class WorkOrderResponse(_Response): request_id: UUID; assigned_to: UUID; scheduled_date: date; completed_date: date|None; status: WorkOrderStatus
+class HostelComplaintCreate(BaseModel): student_id: UUID; category: str=Field(min_length=1); description: str=Field(min_length=1); assigned_to: UUID|None=None
+class HostelComplaintUpdate(BaseModel): category: str|None=Field(None,min_length=1); description: str|None=Field(None,min_length=1); assigned_to: UUID|None=None; resolution_status: ComplaintStatus|None=None; resolution_notes: str|None=None
+class HostelComplaintResponse(HostelComplaintCreate,_Response): assigned_to: UUID|None; resolution_status: ComplaintStatus; resolved_by: UUID|None; resolution_notes: str|None
+class HostelNoticeCreate(BaseModel): title: str=Field(min_length=1); description: str=Field(min_length=1); published_by: UUID; publish_date: date; expiry_date: date|None=None
+class HostelNoticeUpdate(BaseModel): title: str|None=Field(None,min_length=1); description: str|None=Field(None,min_length=1); publish_date: date|None=None; expiry_date: date|None=None; status: NoticeStatus|None=None
+class HostelNoticeResponse(HostelNoticeCreate,_Response): pass
+class HostelSettingCreate(BaseModel): setting_key: HostelSettingKey; setting_value: str; description: str|None=None
+class HostelSettingUpdate(BaseModel): setting_value: str|None=None; description: str|None=None
+class HostelSettingResponse(HostelSettingCreate,_Response): pass
+class HostelLeaveRequestCreate(BaseModel): student_id: UUID; allocation_id: UUID; reason: str=Field(min_length=1); start_date: date; end_date: date
+class HostelLeaveRequestUpdate(BaseModel): reason: str|None=Field(None,min_length=1); start_date: date|None=None; end_date: date|None=None
+class HostelLeaveRequestResponse(HostelLeaveRequestCreate,_Response): approval_status: LeaveApprovalStatus; approved_by: UUID|None
+class HostelComplaintSummaryResponse(BaseModel): total_open: int; total_in_progress: int; total_resolved: int; total_closed: int
+class HostelLeaveSummaryResponse(BaseModel): total_pending: int; total_approved: int; total_rejected: int

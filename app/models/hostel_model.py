@@ -100,3 +100,4 @@ class HostelAllocation(Base):
 
     student = relationship("Student", back_populates="hostel_allocations", lazy="selectin")
     bed: Mapped[HostelBed] = relationship("HostelBed", back_populates="allocations", lazy="selectin")
+    leave_requests: Mapped[list["HostelLeaveRequest"]] = relationship("HostelLeaveRequest", back_populates="allocation", lazy="selectin")

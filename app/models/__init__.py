@@ -19,7 +19,34 @@ from .exam_result_model import ExamResult
 from .report_card_model import ReportCard
 from .assignment_model import Assignment, AssignmentSubmission
 from .communication_model import Announcement, Notification, Message
-from .fee_model import FeeStructure, FeeInvoice, Payment
+from .fee_model import (
+    FeeStructure,
+    FeeInvoice,
+    Payment,
+    FeeType,
+    InvoiceStatus,
+    PaymentMethod,
+    PaymentStatus,
+)
+from .finance_model import (
+    Expense,
+    Salary,
+    StudentCategory,
+    FeeInstallment,
+    StudentFeeAssignment,
+    StudentLedger,
+    ScholarshipType,
+    StudentScholarship,
+    LateFeeRule,
+    RefundRequest,
+    OtherIncome,
+    ExpenseCategory,
+    ExpenseStatus,
+    SalaryStatus,
+    ApprovalStatus,
+    RefundStatus,
+    AssignmentStatus,
+)
 from .admission_model import (
     AdmissionApplication,
     AdmissionApplicationStatus,
@@ -28,11 +55,26 @@ from .admission_model import (
 from .leave_model import LeaveRequest, LeaveStatus, LeaveType
 from .event_model import AcademicCalendar, AcademicCalendarEventType, Event, EventType
 from .library_model import Book, BookCategory, BookIssue, BookIssueStatus
-from .transport_model import Bus, Route, StudentTransport
+from .transport_model import Bus, Route, StudentTransport, Driver
 from .audit_model import AuditLog, LoginHistory
 from .ai_analytics_model import AIAnalytics, AIChatHistory
 from .hostel_model import HostelAllocation, HostelAllocationStatus, HostelBed, HostelBedStatus, HostelBlock, HostelBlockStatus, HostelRoom, HostelRoomStatus
-from .hostel_operations_model import HostelVisitor, HostelFeeStructure, HostelFeeInvoice, HostelPayment, MessMenu, MessExpense, MessCollection, MessAttendance, MaintenanceRequest, WorkOrder
+from .hostel_operations_model import (
+    HostelVisitor,
+    HostelFeeStructure,
+    HostelFeeInvoice,
+    HostelPayment,
+    MessMenu,
+    MessExpense,
+    MessCollection,
+    MessAttendance,
+    MaintenanceRequest,
+    WorkOrder,
+    HostelComplaint,
+    HostelNotice,
+    HostelSetting,
+    HostelLeaveRequest,
+)
 
 Faculty = Teacher
 StudentParent = ParentStudent

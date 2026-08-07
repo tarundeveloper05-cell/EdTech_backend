@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.user import User
@@ -19,6 +20,14 @@ from app.schemas.user import (
 router = APIRouter()
 
 
+def _ensure_admin(current_user: User) -> None:
+    if current_user.role.role_name != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin users can perform this action",
+        )
+
+
 @router.post(
     "/users",
     response_model=UserCreateResponse,
@@ -26,9 +35,10 @@ router = APIRouter()
 )
 async def create_user(
     user_data: UserCreate,
-    session: Annotated[AsyncSession, Depends(get_db)]
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(get_current_user),
 ) -> UserCreateResponse:
-    """Create a new user."""
+    _ensure_admin(current_user)
 
     result = await session.execute(
         select(User).where(User.email == user_data.email)
@@ -74,9 +84,9 @@ async def create_user(
     status_code=status.HTTP_200_OK
 )
 async def get_users(
-    session: Annotated[AsyncSession, Depends(get_db)]
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(get_current_user),
 ) -> list[UserResponse]:
-    """Get all users."""
     result = await session.execute(select(User))
     users = result.scalars().all()
 
@@ -90,9 +100,9 @@ async def get_users(
 )
 async def get_user(
     id: UUID,
-    session: Annotated[AsyncSession, Depends(get_db)]
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(get_current_user),
 ) -> UserResponse:
-    """Get a user by ID."""
     result = await session.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
 
@@ -113,9 +123,11 @@ async def get_user(
 async def update_user(
     id: UUID,
     user_data: UserUpdate,
-    session: Annotated[AsyncSession, Depends(get_db)]
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(get_current_user),
 ) -> UserResponse:
-    """Update a user by ID."""
+    _ensure_admin(current_user)
+
     result = await session.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
 
@@ -171,9 +183,11 @@ async def update_user(
 )
 async def delete_user(
     id: UUID,
-    session: Annotated[AsyncSession, Depends(get_db)]
+    session: Annotated[AsyncSession, Depends(get_db)],
+    current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Delete a user by ID."""
+    _ensure_admin(current_user)
+
     result = await session.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
 

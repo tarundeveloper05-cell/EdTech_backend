@@ -12,6 +12,8 @@ ROLE_CODE_TO_NAME = {
     "0002": "TEACHER",
     "0003": "PARENT",
     "0004": "STUDENT",
+    "0005": "ACCOUNTANT",
+    "0006": "LIBRARIAN",
 }
 
 

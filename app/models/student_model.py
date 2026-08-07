@@ -58,3 +58,5 @@ class Student(Base):
     hostel_allocations = relationship("HostelAllocation", back_populates="student")
     hostel_visitors = relationship("HostelVisitor", back_populates="student")
     hostel_fee_invoices = relationship("HostelFeeInvoice", back_populates="student")
+    hostel_complaints = relationship("HostelComplaint", back_populates="student", cascade="all, delete-orphan")
+    hostel_leave_requests = relationship("HostelLeaveRequest", back_populates="student", cascade="all, delete-orphan")

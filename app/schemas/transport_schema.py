@@ -61,3 +61,28 @@ class StudentTransportResponse(StudentTransportCreate):
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+
+class DriverCreate(BaseModel):
+    driver_name: str
+    license_number: str
+    phone: str | None = None
+    experience: int | None = None
+    bus_id: UUID | None = None
+    status: str = "ACTIVE"
+
+
+class DriverUpdate(BaseModel):
+    driver_name: str | None = None
+    license_number: str | None = None
+    phone: str | None = None
+    experience: int | None = None
+    bus_id: UUID | None = None
+    status: str | None = None
+
+
+class DriverResponse(DriverCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
