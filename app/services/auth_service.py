@@ -6,11 +6,13 @@ import bcrypt
 from jose import jwt
 from jose.exceptions import JWTError
 
+from app.core.config import settings
+
 
 class AuthService:
-    SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "change-this-secret-key")
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    SECRET_KEY: str = settings.SECRET_KEY
+    ALGORITHM: str = settings.ALGORITHM
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
     @staticmethod
     def hash_password(password: str) -> str:

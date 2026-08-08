@@ -141,7 +141,7 @@ def _ensure_admin(current_user: User) -> None:
 finance_router = APIRouter()
 
 
-@finance_router.get("/overview", response_model=FinanceOverviewResponse)
+@finance_router.get("/overview")
 async def get_finance_overview(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -151,7 +151,7 @@ async def get_finance_overview(
     return success_response(data)
 
 
-@finance_router.get("/transactions", response_model=FinanceTransactionListResponse)
+@finance_router.get("/transactions")
 async def list_transactions(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -161,7 +161,7 @@ async def list_transactions(
     return success_response({"items": items, "total": len(items)})
 
 
-@finance_router.get("/expenses", response_model=list[ExpenseResponse])
+@finance_router.get("/expenses")
 async def list_expenses(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -171,7 +171,7 @@ async def list_expenses(
     return success_response(items)
 
 
-@finance_router.post("/expenses", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/expenses", status_code=status.HTTP_201_CREATED)
 async def create_expense(
     payload: ExpenseCreate,
     session: AsyncSession = Depends(get_db),
@@ -182,7 +182,7 @@ async def create_expense(
     return success_response(item, message="Expense created successfully")
 
 
-@finance_router.get("/expenses/{item_id}", response_model=ExpenseResponse)
+@finance_router.get("/expenses/{item_id}")
 async def get_expense(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -193,7 +193,7 @@ async def get_expense(
     return success_response(item)
 
 
-@finance_router.put("/expenses/{item_id}", response_model=ExpenseResponse)
+@finance_router.put("/expenses/{item_id}")
 async def update_expense(
     item_id: UUID,
     payload: ExpenseUpdate,
@@ -246,7 +246,7 @@ async def process_salary(
 
 
 # Fee structures
-@finance_router.get("/fee-structures", response_model=list[FeeStructureResponse])
+@finance_router.get("/fee-structures")
 async def list_fee_structures(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -256,7 +256,7 @@ async def list_fee_structures(
     return success_response(items)
 
 
-@finance_router.get("/fee-structures/{item_id}", response_model=FeeStructureResponse)
+@finance_router.get("/fee-structures/{item_id}")
 async def get_fee_structure(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -267,7 +267,7 @@ async def get_fee_structure(
     return success_response(item)
 
 
-@finance_router.post("/fee-structures", response_model=FeeStructureResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/fee-structures", status_code=status.HTTP_201_CREATED)
 async def create_fee_structure(
     payload: FeeStructureCreate,
     session: AsyncSession = Depends(get_db),
@@ -278,7 +278,7 @@ async def create_fee_structure(
     return success_response(item, message="Fee structure created successfully")
 
 
-@finance_router.put("/fee-structures/{item_id}", response_model=FeeStructureResponse)
+@finance_router.put("/fee-structures/{item_id}")
 async def update_fee_structure(
     item_id: UUID,
     payload: FeeStructureUpdate,
@@ -302,7 +302,7 @@ async def delete_fee_structure(
 
 
 # Invoices
-@finance_router.get("/invoices", response_model=list[FeeInvoiceResponse])
+@finance_router.get("/invoices")
 async def list_invoices(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -312,7 +312,7 @@ async def list_invoices(
     return success_response(items)
 
 
-@finance_router.get("/invoices/{item_id}", response_model=FeeInvoiceResponse)
+@finance_router.get("/invoices/{item_id}")
 async def get_invoice(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -323,7 +323,7 @@ async def get_invoice(
     return success_response(item)
 
 
-@finance_router.post("/invoices/generate", response_model=FeeInvoiceResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/invoices/generate", status_code=status.HTTP_201_CREATED)
 async def generate_invoice(
     payload: FeeInvoiceCreate,
     session: AsyncSession = Depends(get_db),
@@ -335,7 +335,7 @@ async def generate_invoice(
 
 
 # Student Categories
-@finance_router.get("/student-categories", response_model=list[StudentCategoryResponse])
+@finance_router.get("/student-categories")
 async def list_student_categories(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -345,7 +345,7 @@ async def list_student_categories(
     return success_response(items)
 
 
-@finance_router.post("/student-categories", response_model=StudentCategoryResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/student-categories", status_code=status.HTTP_201_CREATED)
 async def create_student_category(
     payload: StudentCategoryCreate,
     session: AsyncSession = Depends(get_db),
@@ -356,7 +356,7 @@ async def create_student_category(
     return success_response(item, message="Student category created successfully")
 
 
-@finance_router.get("/student-categories/{item_id}", response_model=StudentCategoryResponse)
+@finance_router.get("/student-categories/{item_id}")
 async def get_student_category(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -366,7 +366,7 @@ async def get_student_category(
     return success_response(item)
 
 
-@finance_router.put("/student-categories/{item_id}", response_model=StudentCategoryResponse)
+@finance_router.put("/student-categories/{item_id}")
 async def update_student_category(
     item_id: UUID,
     payload: StudentCategoryUpdate,
@@ -390,7 +390,7 @@ async def delete_student_category(
 
 
 # Fee Installments
-@finance_router.get("/fee-installments", response_model=list[FeeInstallmentResponse])
+@finance_router.get("/fee-installments")
 async def list_fee_installments(
     fee_structure_id: UUID | None = Query(None),
     session: AsyncSession = Depends(get_db),
@@ -404,7 +404,7 @@ async def list_fee_installments(
     return success_response(items)
 
 
-@finance_router.post("/fee-installments", response_model=FeeInstallmentResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/fee-installments", status_code=status.HTTP_201_CREATED)
 async def create_fee_installment(
     payload: FeeInstallmentCreate,
     session: AsyncSession = Depends(get_db),
@@ -415,7 +415,7 @@ async def create_fee_installment(
     return success_response(item, message="Fee installment created successfully")
 
 
-@finance_router.get("/fee-installments/{item_id}", response_model=FeeInstallmentResponse)
+@finance_router.get("/fee-installments/{item_id}")
 async def get_fee_installment(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -425,7 +425,7 @@ async def get_fee_installment(
     return success_response(item)
 
 
-@finance_router.put("/fee-installments/{item_id}", response_model=FeeInstallmentResponse)
+@finance_router.put("/fee-installments/{item_id}")
 async def update_fee_installment(
     item_id: UUID,
     payload: FeeInstallmentUpdate,
@@ -449,7 +449,7 @@ async def delete_fee_installment(
 
 
 # Student Fee Assignments
-@finance_router.get("/student-fee-assignments", response_model=list[StudentFeeAssignmentResponse])
+@finance_router.get("/student-fee-assignments")
 async def list_student_fee_assignments(
     student_id: UUID | None = Query(None),
     academic_year: str | None = Query(None),
@@ -464,7 +464,7 @@ async def list_student_fee_assignments(
     return success_response(items)
 
 
-@finance_router.post("/student-fee-assignments", response_model=StudentFeeAssignmentResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/student-fee-assignments", status_code=status.HTTP_201_CREATED)
 async def create_student_fee_assignment(
     payload: StudentFeeAssignmentCreate,
     session: AsyncSession = Depends(get_db),
@@ -475,7 +475,7 @@ async def create_student_fee_assignment(
     return success_response(item, message="Student fee assignment created successfully")
 
 
-@finance_router.get("/student-fee-assignments/{item_id}", response_model=StudentFeeAssignmentResponse)
+@finance_router.get("/student-fee-assignments/{item_id}")
 async def get_student_fee_assignment(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -485,7 +485,7 @@ async def get_student_fee_assignment(
     return success_response(item)
 
 
-@finance_router.put("/student-fee-assignments/{item_id}", response_model=StudentFeeAssignmentResponse)
+@finance_router.put("/student-fee-assignments/{item_id}")
 async def update_student_fee_assignment(
     item_id: UUID,
     payload: StudentFeeAssignmentUpdate,
@@ -534,7 +534,7 @@ async def bulk_assign_fee(
 
 
 # Student Ledgers
-@finance_router.get("/ledgers/{student_id}", response_model=list[StudentLedgerResponse])
+@finance_router.get("/ledgers/{student_id}")
 async def get_student_ledger(
     student_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -545,7 +545,7 @@ async def get_student_ledger(
     return success_response(items)
 
 
-@finance_router.get("/ledgers/{student_id}/summary", response_model=StudentLedgerSummaryResponse)
+@finance_router.get("/ledgers/{student_id}/summary")
 async def get_student_ledger_summary(
     student_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -557,7 +557,7 @@ async def get_student_ledger_summary(
 
 
 # Scholarships
-@finance_router.get("/scholarship-types", response_model=list[ScholarshipTypeResponse])
+@finance_router.get("/scholarship-types")
 async def list_scholarship_types(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -567,7 +567,7 @@ async def list_scholarship_types(
     return success_response(items)
 
 
-@finance_router.post("/scholarship-types", response_model=ScholarshipTypeResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/scholarship-types", status_code=status.HTTP_201_CREATED)
 async def create_scholarship_type(
     payload: ScholarshipTypeCreate,
     session: AsyncSession = Depends(get_db),
@@ -578,7 +578,7 @@ async def create_scholarship_type(
     return success_response(item, message="Scholarship type created successfully")
 
 
-@finance_router.get("/scholarships", response_model=list[StudentScholarshipResponse])
+@finance_router.get("/scholarships")
 async def list_scholarships(
     student_id: UUID | None = Query(None),
     session: AsyncSession = Depends(get_db),
@@ -592,7 +592,7 @@ async def list_scholarships(
     return success_response(items)
 
 
-@finance_router.post("/scholarships", response_model=StudentScholarshipResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/scholarships", status_code=status.HTTP_201_CREATED)
 async def create_scholarship(
     payload: StudentScholarshipCreate,
     session: AsyncSession = Depends(get_db),
@@ -603,7 +603,7 @@ async def create_scholarship(
     return success_response(item, message="Scholarship assigned successfully")
 
 
-@finance_router.get("/scholarships/{item_id}", response_model=StudentScholarshipResponse)
+@finance_router.get("/scholarships/{item_id}")
 async def get_scholarship(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -613,7 +613,7 @@ async def get_scholarship(
     return success_response(item)
 
 
-@finance_router.put("/scholarships/{item_id}", response_model=StudentScholarshipResponse)
+@finance_router.put("/scholarships/{item_id}")
 async def update_scholarship(
     item_id: UUID,
     payload: StudentScholarshipUpdate,
@@ -625,7 +625,7 @@ async def update_scholarship(
     return success_response(item, message="Scholarship updated successfully")
 
 
-@finance_router.post("/scholarships/{item_id}/approve", response_model=StudentScholarshipResponse)
+@finance_router.post("/scholarships/{item_id}/approve")
 async def approve_scholarship(
     item_id: UUID,
     payload: dict = Body(...),
@@ -637,7 +637,7 @@ async def approve_scholarship(
     return success_response(item, message="Scholarship approved successfully")
 
 
-@finance_router.post("/scholarships/{item_id}/reject", response_model=StudentScholarshipResponse)
+@finance_router.post("/scholarships/{item_id}/reject")
 async def reject_scholarship(
     item_id: UUID,
     payload: dict = Body(...),
@@ -650,7 +650,7 @@ async def reject_scholarship(
 
 
 # Late Fee Rules
-@finance_router.get("/late-fee-rules", response_model=list[LateFeeRuleResponse])
+@finance_router.get("/late-fee-rules")
 async def list_late_fee_rules(
     fee_structure_id: UUID | None = Query(None),
     session: AsyncSession = Depends(get_db),
@@ -664,7 +664,7 @@ async def list_late_fee_rules(
     return success_response(items)
 
 
-@finance_router.post("/late-fee-rules", response_model=LateFeeRuleResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/late-fee-rules", status_code=status.HTTP_201_CREATED)
 async def create_late_fee_rule(
     payload: LateFeeRuleCreate,
     session: AsyncSession = Depends(get_db),
@@ -675,7 +675,7 @@ async def create_late_fee_rule(
     return success_response(item, message="Late fee rule created successfully")
 
 
-@finance_router.get("/late-fee-rules/{item_id}", response_model=LateFeeRuleResponse)
+@finance_router.get("/late-fee-rules/{item_id}")
 async def get_late_fee_rule(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -685,7 +685,7 @@ async def get_late_fee_rule(
     return success_response(item)
 
 
-@finance_router.put("/late-fee-rules/{item_id}", response_model=LateFeeRuleResponse)
+@finance_router.put("/late-fee-rules/{item_id}")
 async def update_late_fee_rule(
     item_id: UUID,
     payload: LateFeeRuleUpdate,
@@ -708,7 +708,7 @@ async def apply_late_fees(
 
 
 # Refunds
-@finance_router.get("/refunds", response_model=list[RefundRequestResponse])
+@finance_router.get("/refunds")
 async def list_refunds(
     status: str | None = Query(None),
     session: AsyncSession = Depends(get_db),
@@ -722,7 +722,7 @@ async def list_refunds(
     return success_response(items)
 
 
-@finance_router.post("/refunds", response_model=RefundRequestResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/refunds", status_code=status.HTTP_201_CREATED)
 async def create_refund(
     payload: RefundRequestCreate,
     session: AsyncSession = Depends(get_db),
@@ -733,7 +733,7 @@ async def create_refund(
     return success_response(item, message="Refund request created successfully")
 
 
-@finance_router.get("/refunds/{item_id}", response_model=RefundRequestResponse)
+@finance_router.get("/refunds/{item_id}")
 async def get_refund(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -743,7 +743,7 @@ async def get_refund(
     return success_response(item)
 
 
-@finance_router.put("/refunds/{item_id}", response_model=RefundRequestResponse)
+@finance_router.put("/refunds/{item_id}")
 async def update_refund(
     item_id: UUID,
     payload: RefundRequestUpdate,
@@ -755,7 +755,7 @@ async def update_refund(
     return success_response(item, message="Refund updated successfully")
 
 
-@finance_router.post("/refunds/{item_id}/approve", response_model=RefundRequestResponse)
+@finance_router.post("/refunds/{item_id}/approve")
 async def approve_refund(
     item_id: UUID,
     payload: dict = Body(...),
@@ -767,7 +767,7 @@ async def approve_refund(
     return success_response(item, message="Refund approved successfully")
 
 
-@finance_router.post("/refunds/{item_id}/process", response_model=RefundRequestResponse)
+@finance_router.post("/refunds/{item_id}/process")
 async def process_refund(
     item_id: UUID,
     payload: dict = Body(...),
@@ -779,7 +779,7 @@ async def process_refund(
     return success_response(item, message="Refund processed successfully")
 
 
-@finance_router.post("/refunds/{item_id}/reject", response_model=RefundRequestResponse)
+@finance_router.post("/refunds/{item_id}/reject")
 async def reject_refund(
     item_id: UUID,
     payload: dict = Body(...),
@@ -792,7 +792,7 @@ async def reject_refund(
 
 
 # Other Income
-@finance_router.get("/incomes", response_model=list[OtherIncomeResponse])
+@finance_router.get("/incomes")
 async def list_incomes(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -802,7 +802,7 @@ async def list_incomes(
     return success_response(items)
 
 
-@finance_router.post("/incomes", response_model=OtherIncomeResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/incomes", status_code=status.HTTP_201_CREATED)
 async def create_income(
     payload: OtherIncomeCreate,
     session: AsyncSession = Depends(get_db),
@@ -813,7 +813,7 @@ async def create_income(
     return success_response(item, message="Income recorded successfully")
 
 
-@finance_router.get("/incomes/{item_id}", response_model=OtherIncomeResponse)
+@finance_router.get("/incomes/{item_id}")
 async def get_income(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -823,7 +823,7 @@ async def get_income(
     return success_response(item)
 
 
-@finance_router.put("/incomes/{item_id}", response_model=OtherIncomeResponse)
+@finance_router.put("/incomes/{item_id}")
 async def update_income(
     item_id: UUID,
     payload: OtherIncomeUpdate,
@@ -847,7 +847,7 @@ async def delete_income(
 
 
 # Expense Categories
-@finance_router.get("/expense-categories", response_model=list[ExpenseCategoryResponse])
+@finance_router.get("/expense-categories")
 async def list_expense_categories(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -857,7 +857,7 @@ async def list_expense_categories(
     return success_response(items)
 
 
-@finance_router.post("/expense-categories", response_model=ExpenseCategoryResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/expense-categories", status_code=status.HTTP_201_CREATED)
 async def create_expense_category(
     payload: ExpenseCategoryCreate,
     session: AsyncSession = Depends(get_db),
@@ -868,7 +868,7 @@ async def create_expense_category(
     return success_response(item, message="Expense category created successfully")
 
 
-@finance_router.get("/expense-categories/{item_id}", response_model=ExpenseCategoryResponse)
+@finance_router.get("/expense-categories/{item_id}")
 async def get_expense_category(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -878,7 +878,7 @@ async def get_expense_category(
     return success_response(item)
 
 
-@finance_router.put("/expense-categories/{item_id}", response_model=ExpenseCategoryResponse)
+@finance_router.put("/expense-categories/{item_id}")
 async def update_expense_category(
     item_id: UUID,
     payload: ExpenseCategoryUpdate,
@@ -1068,7 +1068,7 @@ async def report_library_fine(
 
 
 # Receipts
-@finance_router.get("/receipts/{payment_id}", response_model=ReceiptResponse)
+@finance_router.get("/receipts/{payment_id}")
 async def get_receipt(
     payment_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -1078,7 +1078,7 @@ async def get_receipt(
     return success_response(data)
 
 
-@finance_router.get("/invoices/{invoice_id}/pdf", response_model=InvoiceResponse)
+@finance_router.get("/invoices/{invoice_id}/pdf")
 async def get_invoice_pdf(
     invoice_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -1089,7 +1089,7 @@ async def get_invoice_pdf(
 
 
 # Dashboards
-@finance_router.get("/dashboard/admin", response_model=AdminDashboardResponse)
+@finance_router.get("/dashboard/admin")
 async def get_admin_dashboard(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1099,7 +1099,7 @@ async def get_admin_dashboard(
     return success_response(data)
 
 
-@finance_router.get("/dashboard/student/{student_id}", response_model=StudentDashboardResponse)
+@finance_router.get("/dashboard/student/{student_id}")
 async def get_student_finance_dashboard(
     student_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -1124,7 +1124,7 @@ async def get_student_finance_dashboard(
     return success_response(data)
 
 
-@finance_router.get("/dashboard/parent/{parent_id}", response_model=ParentDashboardResponse)
+@finance_router.get("/dashboard/parent/{parent_id}")
 async def get_parent_finance_dashboard(
     parent_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -1146,7 +1146,7 @@ async def get_parent_finance_dashboard(
 
 
 # Payments
-@finance_router.get("/payments", response_model=list[PaymentResponse])
+@finance_router.get("/payments")
 async def list_payments(
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -1156,7 +1156,7 @@ async def list_payments(
     return success_response(items)
 
 
-@finance_router.post("/payments", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+@finance_router.post("/payments", status_code=status.HTTP_201_CREATED)
 async def create_payment(
     payload: PaymentCreate,
     session: AsyncSession = Depends(get_db),
@@ -1167,7 +1167,7 @@ async def create_payment(
     return success_response(item, message="Payment recorded successfully")
 
 
-@finance_router.get("/payments/{item_id}", response_model=PaymentResponse)
+@finance_router.get("/payments/{item_id}")
 async def get_payment(
     item_id: UUID,
     session: AsyncSession = Depends(get_db),
@@ -1178,7 +1178,7 @@ async def get_payment(
     return success_response(item)
 
 
-@finance_router.put("/payments/{item_id}", response_model=PaymentResponse)
+@finance_router.put("/payments/{item_id}")
 async def update_payment(
     item_id: UUID,
     payload: PaymentUpdate,

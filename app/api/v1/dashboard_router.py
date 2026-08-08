@@ -1,14 +1,24 @@
+from datetime import date
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.models.attendance_model
+import app.models.class_model
+import app.models.library_model
+import app.models.subject_model
+import app.models.teacher_subject_model
+import app.models.timetable_model
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
 from app.models.class_model import Class
 from app.models.event_model import Event
 from app.models.fee_model import FeeInvoice, Payment
+from app.models.parent_model import Parent
+from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
 from app.models.subject_model import Subject
 from app.models.teacher_model import Teacher
@@ -19,11 +29,50 @@ router = APIRouter()
 
 def _ensure_admin(current_user: User) -> None:
     if current_user.role.role_name != "ADMIN":
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin users can access dashboard stats",
         )
+
+
+async def _ensure_teacher_access(session: AsyncSession, current_user: User, teacher_id: UUID) -> None:
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name == "ADMIN":
+        return
+    if role_name == "TEACHER":
+        result = await session.execute(
+            select(Teacher).where(Teacher.id == teacher_id, Teacher.user_id == current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have permission to access this teacher's records",
+    )
+
+
+async def _ensure_student_access(session: AsyncSession, current_user: User, student_id: UUID) -> None:
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name == "ADMIN":
+        return
+    if role_name == "STUDENT":
+        result = await session.execute(
+            select(Student).where(Student.id == student_id, Student.user_id == current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    if role_name == "PARENT":
+        result = await session.execute(
+            select(ParentStudent)
+            .join(Parent, Parent.id == ParentStudent.parent_id)
+            .where(Parent.user_id == current_user.id, ParentStudent.student_id == student_id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have permission to access this student's records",
+    )
 
 
 @router.get("/stats")
@@ -82,21 +131,21 @@ async def get_dashboard_stats(
 
 @router.get("/teacher/{teacher_id}")
 async def get_teacher_dashboard(
-    teacher_id: Any,
+    teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role.role_name not in ("ADMIN", "TEACHER"):
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin or teacher users can access this dashboard",
         )
 
+    await _ensure_teacher_access(session, current_user, teacher_id)
+
     teacher = await session.execute(select(Teacher).where(Teacher.id == teacher_id))
     teacher_obj = teacher.scalar_one_or_none()
     if teacher_obj is None:
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Teacher not found",
@@ -137,21 +186,21 @@ async def get_teacher_dashboard(
 
 @router.get("/student/{student_id}")
 async def get_student_dashboard(
-    student_id: Any,
+    student_id: UUID,
     session: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role.role_name not in ("ADMIN", "STUDENT"):
-        from fastapi import HTTPException
+    if current_user.role.role_name not in ("ADMIN", "STUDENT", "PARENT"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only admin or student users can access this dashboard",
+            detail="Only admin, student, or parent users can access this dashboard",
         )
+
+    await _ensure_student_access(session, current_user, student_id)
 
     student = await session.execute(select(Student).where(Student.id == student_id))
     student_obj = student.scalar_one_or_none()
     if student_obj is None:
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Student not found",
@@ -181,7 +230,7 @@ async def get_student_dashboard(
     paid_result = await session.execute(
         select(func.coalesce(func.sum(Payment.amount_paid), 0))
         .select_from(Payment)
-        .join(FeeInvoice, FeeInvoice.id == Payment.fee_invoice_id)
+        .join(FeeInvoice, FeeInvoice.id == Payment.invoice_id)
         .where(FeeInvoice.student_id == student_id)
     )
     paid_fees = paid_result.scalar() or 0
@@ -203,7 +252,6 @@ async def get_librarian_dashboard(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role.role_name not in ("ADMIN", "LIBRARIAN"):
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin or librarian users can access this dashboard",

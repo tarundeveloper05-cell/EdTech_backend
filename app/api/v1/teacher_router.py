@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,11 +28,31 @@ router = build_crud_router(teacher_service, TeacherCreate, TeacherUpdate, Teache
 
 def _ensure_admin(current_user: User) -> None:
     if current_user.role.role_name != "ADMIN":
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin users can perform this action",
         )
+
+
+async def _ensure_teacher_access(
+    teacher_id: UUID,
+    session: AsyncSession,
+    current_user: User,
+) -> None:
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name == "ADMIN":
+        await teacher_service.get(session, teacher_id)
+        return
+    if role_name == "TEACHER":
+        result = await session.execute(
+            select(Teacher).where(Teacher.id == teacher_id, Teacher.user_id == current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have permission to access this teacher's records",
+    )
 
 
 @router.post("", response_model=TeacherResponse, status_code=status.HTTP_201_CREATED)
@@ -69,9 +89,11 @@ async def delete_teacher(
 
 @router.get("/{teacher_id}/classes", response_model=list[ClassResponse])
 async def get_classes_by_teacher(
-    teacher_id: UUID, session: AsyncSession = Depends(get_db)
+    teacher_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    await teacher_service.get(session, teacher_id)
+    await _ensure_teacher_access(teacher_id, session, current_user)
     result = await session.execute(
         select(Class)
         .join(TeacherSubject, TeacherSubject.class_id == Class.id)
@@ -83,9 +105,11 @@ async def get_classes_by_teacher(
 
 @router.get("/{teacher_id}/subjects", response_model=list[SubjectResponse])
 async def get_subjects_by_teacher(
-    teacher_id: UUID, session: AsyncSession = Depends(get_db)
+    teacher_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    await teacher_service.get(session, teacher_id)
+    await _ensure_teacher_access(teacher_id, session, current_user)
     result = await session.execute(
         select(Subject)
         .join(TeacherSubject, TeacherSubject.subject_id == Subject.id)
@@ -105,7 +129,6 @@ async def get_current_teacher(
     )
     teacher = result.scalar_one_or_none()
     if teacher is None:
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Teacher profile not found",
@@ -117,7 +140,9 @@ async def get_current_teacher(
 async def get_teacher_timetable(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_teacher_access(teacher_id, session, current_user)
     result = await session.execute(
         select(Timetable)
         .where(Timetable.teacher_id == teacher_id)
@@ -144,7 +169,9 @@ async def get_teacher_timetable(
 async def get_teacher_pending_submissions(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_teacher_access(teacher_id, session, current_user)
     from app.models.assignment_model import AssignmentSubmission, Assignment
     result = await session.execute(
         select(AssignmentSubmission, Assignment, Class, Student, Subject)
@@ -176,7 +203,9 @@ async def get_teacher_pending_submissions(
 async def get_teacher_performance(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_teacher_access(teacher_id, session, current_user)
     from app.models.exam_result_model import ExamResult
     result = await session.execute(
         select(Class.id, Class.class_name, func.avg(ExamResult.marks_obtained).label("avg_marks"))
@@ -200,11 +229,12 @@ async def get_teacher_performance(
 async def get_teacher_messages(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_teacher_access(teacher_id, session, current_user)
     teacher = await session.execute(select(Teacher).where(Teacher.id == teacher_id))
     teacher_obj = teacher.scalar_one_or_none()
     if not teacher_obj:
-        from fastapi import HTTPException
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Teacher not found")
 
     result = await session.execute(
@@ -231,7 +261,9 @@ async def get_teacher_messages(
 async def get_teacher_events(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_teacher_access(teacher_id, session, current_user)
     from app.models.event_model import Event
     result = await session.execute(
         select(Event)
@@ -256,7 +288,9 @@ async def get_teacher_events(
 async def get_teacher_assignments(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_teacher_access(teacher_id, session, current_user)
     result = await session.execute(
         select(Assignment, Class, Subject)
         .join(Class, Class.id == Assignment.class_id)
@@ -283,7 +317,9 @@ async def get_teacher_assignments(
 async def get_teacher_exam_results(
     teacher_id: UUID,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_teacher_access(teacher_id, session, current_user)
     result = await session.execute(
         select(ExamResult, Class, Subject, Student)
         .join(Class, Class.id == ExamResult.class_id)

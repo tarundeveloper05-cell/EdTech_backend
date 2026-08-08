@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
+from app.api.v1.router_factory import require_roles
 from app.api.v1.router_factory import build_crud_router
 from app.core.database import get_db
 from app.models.exam_result_model import ExamResult
@@ -237,9 +238,11 @@ async def get_current_student_library(
 
 @router.get("/{student_id}/exam-results", response_model=list[ExamResultResponse])
 async def get_student_exam_results(
-    student_id: UUID, session: AsyncSession = Depends(get_db)
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    await student_service.get(session, student_id)
+    await ensure_student_access(session, current_user, student_id)
     result = await session.execute(
         select(ExamResult).where(ExamResult.student_id == student_id)
     )
@@ -248,13 +251,40 @@ async def get_student_exam_results(
 
 @router.get("/{student_id}/report-cards", response_model=list[ReportCardResponse])
 async def get_student_report_cards(
-    student_id: UUID, session: AsyncSession = Depends(get_db)
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await ensure_student_access(session, current_user, student_id)
     return await report_card_service.get_student_report_cards(session, student_id)
 
 
 @router.get("/{student_id}/performance", response_model=StudentPerformanceSummary)
 async def get_student_performance(
-    student_id: UUID, session: AsyncSession = Depends(get_db)
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await ensure_student_access(session, current_user, student_id)
     return await report_card_service.get_performance_summary(session, student_id)
+
+
+async def ensure_student_access(
+    session: AsyncSession,
+    current_user: User,
+    student_id: UUID,
+) -> None:
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name == "ADMIN":
+        await student_service.get(session, student_id)
+        return
+    if role_name == "STUDENT":
+        result = await session.execute(
+            select(Student).where(Student.id == student_id, Student.user_id == current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have permission to access this student's records",
+    )

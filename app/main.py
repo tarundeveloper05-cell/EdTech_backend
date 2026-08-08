@@ -46,6 +46,7 @@ from app.api.v1.library_router import (
 from app.api.v1.transport_router import bus_router, route_router, student_transport_detail_router, student_transport_router, transport_router
 from app.api.v1.auth.routes import router as auth_router
 from app.core.database import AsyncSessionLocal
+from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.rate_limit import RateLimitMiddleware
 from app.services.auth_service import AuthService
@@ -78,11 +79,21 @@ app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
 app.include_router(dashboard_router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(admin_router, prefix="/admins", tags=["Admins"])
 app.include_router(department_router, prefix="/departments", tags=["Departments"])

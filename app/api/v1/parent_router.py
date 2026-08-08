@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth.routes import get_current_user
 from app.api.v1.router_factory import build_crud_router
 from app.core.database import get_db
+from app.models.parent_model import Parent
 from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
 from app.models.user import User
@@ -71,16 +72,16 @@ async def get_current_parent(
             detail="Only parent users can access this endpoint",
         )
     result = await session.execute(
-        select(ParentStudent).where(ParentStudent.parent_id == current_user.id)
+        select(Parent).where(Parent.user_id == current_user.id)
     )
-    parent_student = result.scalar_one_or_none()
-    if not parent_student:
+    parent_obj = result.scalar_one_or_none()
+    if not parent_obj:
         from fastapi import HTTPException
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Parent profile not found",
         )
-    return await parent_service.get(session, parent_student.parent_id)
+    return parent_obj
 
 
 @router.get("/me/students", response_model=list[StudentResponse])
@@ -98,7 +99,8 @@ async def get_my_students(
     result = await session.execute(
         select(Student)
         .join(ParentStudent, ParentStudent.student_id == Student.id)
-        .where(ParentStudent.parent_id == current_user.id)
+        .join(Parent, Parent.id == ParentStudent.parent_id)
+        .where(Parent.user_id == current_user.id)
     )
     return result.scalars().all()
 
@@ -118,7 +120,8 @@ async def get_my_children_fees(
     result = await session.execute(
         select(Student)
         .join(ParentStudent, ParentStudent.student_id == Student.id)
-        .where(ParentStudent.parent_id == current_user.id)
+        .join(Parent, Parent.id == ParentStudent.parent_id)
+        .where(Parent.user_id == current_user.id)
     )
     children = result.scalars().all()
 
