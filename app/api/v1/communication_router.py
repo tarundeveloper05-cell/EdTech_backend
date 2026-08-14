@@ -1,8 +1,10 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
+from app.models.communication_model import Announcement, Message, Notification
 from app.models.user import User
 from app.schemas.communication_schema import AnnouncementCreate, AnnouncementResponse, AnnouncementUpdate, MessageCreate, MessageResponse, NotificationCreate, NotificationResponse, NotificationUpdate
 from app.services.communication_service import announcement_service, message_service, notification_service
@@ -11,6 +13,7 @@ announcement_router = APIRouter()
 notification_router = APIRouter()
 message_router = APIRouter()
 user_communication_router = APIRouter()
+communication_router = APIRouter()
 
 
 def _ensure_admin(current_user: User) -> None:
@@ -20,6 +23,47 @@ def _ensure_admin(current_user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin users can perform this action",
         )
+
+
+@communication_router.get("/statistics")
+async def get_communication_statistics(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_admin(current_user)
+    total_messages = await session.scalar(select(func.count(Message.id)))
+    unread_messages = await session.scalar(select(func.count(Message.id)).where(Message.is_read.is_(False)))
+    total_announcements = await session.scalar(select(func.count(Announcement.id)))
+    total_notifications = await session.scalar(select(func.count(Notification.id)))
+    unread_notifications = await session.scalar(select(func.count(Notification.id)).where(Notification.is_read.is_(False)))
+    total_communications = (total_messages or 0) + (total_announcements or 0) + (total_notifications or 0)
+
+    return {
+        "total_communications": total_communications,
+        "total_messages": total_messages or 0,
+        "unread_messages": unread_messages or 0,
+        "total_announcements": total_announcements or 0,
+        "total_notifications": total_notifications or 0,
+        "unread_notifications": unread_notifications or 0,
+        "delivered": total_communications,
+        "failed": 0,
+        "delivery_rate": 100 if total_communications else 0,
+        "channels": [
+            {"label": "Messages", "value": total_messages or 0},
+            {"label": "Announcements", "value": total_announcements or 0},
+            {"label": "Notifications", "value": total_notifications or 0},
+        ],
+        "audiences": [],
+        "delivery": [
+            {"label": "Delivered", "value": total_communications},
+            {"label": "Failed", "value": 0},
+        ],
+        "types": [
+            {"type": "Messages", "messages": total_messages or 0},
+            {"type": "Announcements", "messages": total_announcements or 0},
+            {"type": "Notifications", "messages": total_notifications or 0},
+        ],
+    }
 
 
 @announcement_router.post("", response_model=AnnouncementResponse, status_code=status.HTTP_201_CREATED)

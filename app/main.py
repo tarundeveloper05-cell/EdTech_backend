@@ -26,7 +26,7 @@ from app.api.v1.timetable_router import router as timetable_router
 from app.api.v1.report_card_router import router as report_card_router
 from app.api.v1.users.routes import router as user_router
 from app.api.v1.assignment_router import router as assignment_router, submission_router, teacher_assignment_router, class_assignment_router, student_assignment_router
-from app.api.v1.communication_router import announcement_router, notification_router, message_router, user_communication_router, teacher_communication_router
+from app.api.v1.communication_router import announcement_router, notification_router, message_router, user_communication_router, teacher_communication_router, communication_router
 from app.api.v1.fee_router import fee_structure_router, fee_invoice_router, payment_router, student_fee_router, accountant_fee_router
 from app.api.v1.leave_router import leave_request_router, leave_type_router, user_leave_router
 from app.api.v1.event_router import academic_calendar_router, event_router
@@ -118,6 +118,7 @@ app.include_router(student_assignment_router, prefix="/students", tags=["Student
 app.include_router(announcement_router, prefix="/announcements", tags=["Announcements"])
 app.include_router(notification_router, prefix="/notifications", tags=["Notifications"])
 app.include_router(message_router, prefix="/messages", tags=["Messages"])
+app.include_router(communication_router, prefix="/communication", tags=["Communication"])
 app.include_router(user_communication_router, prefix="/users", tags=["User Communication"])
 app.include_router(teacher_communication_router, prefix="/teachers", tags=["Teacher Communication"])
 app.include_router(fee_structure_router, prefix="/fee-structures", tags=["Fee Structures"])
