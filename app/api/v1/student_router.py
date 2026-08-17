@@ -9,7 +9,10 @@ from app.api.v1.router_factory import require_roles
 from app.api.v1.router_factory import build_crud_router
 from app.core.database import get_db
 from app.models.exam_result_model import ExamResult
+from app.models.parent_model import Parent
+from app.models.parent_student_model import ParentStudent
 from app.models.student_model import Student
+from app.models.timetable_model import Timetable
 from app.models.user import User
 from app.schemas.student_schema import StudentCreate, StudentResponse, StudentUpdate
 from app.schemas.exam_schema import (
@@ -42,6 +45,131 @@ async def get_current_student_profile(
     student: Student = Depends(get_current_student),
 ):
     return student
+
+
+@router.get("/me/timetable", response_model=list[dict])
+async def get_current_student_timetable(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_db),
+):
+    if student.class_id is None:
+        return []
+
+    result = await session.execute(
+        select(Timetable).where(Timetable.class_id == student.class_id)
+    )
+    entries = result.scalars().all()
+    return [
+        {
+            "id": str(entry.id),
+            "class_id": str(entry.class_id),
+            "subject_id": str(entry.subject_id),
+            "subject_name": entry.subject.subject_name if entry.subject else None,
+            "teacher_id": str(entry.teacher_id),
+            "teacher_name": entry.teacher.user.username if entry.teacher and entry.teacher.user else None,
+            "day_of_week": entry.day_of_week,
+            "start_time": str(entry.start_time),
+            "end_time": str(entry.end_time),
+            "room_no": entry.room_no,
+            "period_no": entry.period_no,
+            "created_at": entry.created_at,
+            "updated_at": entry.updated_at,
+        }
+        for entry in entries
+    ]
+
+
+@router.get("/me/assignments", response_model=list[dict])
+async def get_current_student_assignments(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_db),
+):
+    from app.models.assignment_model import Assignment, AssignmentSubmission
+
+    if student.class_id is None:
+        return []
+
+    assignments_result = await session.execute(
+        select(Assignment).where(Assignment.class_id == student.class_id)
+    )
+    assignments = assignments_result.scalars().all()
+    submissions_result = await session.execute(
+        select(AssignmentSubmission).where(AssignmentSubmission.student_id == student.id)
+    )
+    submissions_by_assignment = {
+        submission.assignment_id: submission
+        for submission in submissions_result.scalars().all()
+    }
+
+    return [
+        {
+            "id": str(assignment.id),
+            "teacher_id": str(assignment.teacher_id),
+            "teacher_name": assignment.teacher.user.username if assignment.teacher and assignment.teacher.user else None,
+            "class_id": str(assignment.class_id),
+            "subject_id": str(assignment.subject_id),
+            "subject_name": assignment.subject.subject_name if assignment.subject else None,
+            "title": assignment.title,
+            "description": assignment.description,
+            "due_date": assignment.due_date,
+            "attachment": assignment.attachment,
+            "created_at": assignment.created_at,
+            "updated_at": assignment.updated_at,
+            "submission": (
+                {
+                    "id": str(submissions_by_assignment[assignment.id].id),
+                    "assignment_id": str(submissions_by_assignment[assignment.id].assignment_id),
+                    "student_id": str(submissions_by_assignment[assignment.id].student_id),
+                    "submitted_on": submissions_by_assignment[assignment.id].submitted_on,
+                    "file_path": submissions_by_assignment[assignment.id].file_path,
+                    "marks": submissions_by_assignment[assignment.id].marks,
+                    "remarks": submissions_by_assignment[assignment.id].remarks,
+                    "created_at": submissions_by_assignment[assignment.id].created_at,
+                    "updated_at": submissions_by_assignment[assignment.id].updated_at,
+                }
+                if assignment.id in submissions_by_assignment
+                else None
+            ),
+        }
+        for assignment in assignments
+    ]
+
+
+@router.get("/me/submissions", response_model=list[dict])
+async def get_current_student_submissions(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_db),
+):
+    from app.models.assignment_model import AssignmentSubmission
+
+    result = await session.execute(
+        select(AssignmentSubmission).where(AssignmentSubmission.student_id == student.id)
+    )
+    return [
+        {
+            "id": str(submission.id),
+            "assignment_id": str(submission.assignment_id),
+            "student_id": str(submission.student_id),
+            "submitted_on": submission.submitted_on,
+            "file_path": submission.file_path,
+            "marks": submission.marks,
+            "remarks": submission.remarks,
+            "created_at": submission.created_at,
+            "updated_at": submission.updated_at,
+        }
+        for submission in result.scalars().all()
+    ]
+
+
+@router.get("/me/exam-results", response_model=list[ExamResultResponse])
+async def get_current_student_exam_results(
+    student: Student = Depends(get_current_student),
+    session: AsyncSession = Depends(get_db),
+):
+    result = await session.execute(
+        select(ExamResult).where(ExamResult.student_id == student.id)
+    )
+    return result.scalars().all()
 
 
 @router.get("/me/hostel", response_model=dict)
@@ -281,6 +409,14 @@ async def ensure_student_access(
     if role_name == "STUDENT":
         result = await session.execute(
             select(Student).where(Student.id == student_id, Student.user_id == current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    if role_name == "PARENT":
+        result = await session.execute(
+            select(ParentStudent)
+            .join(Parent, Parent.id == ParentStudent.parent_id)
+            .where(Parent.user_id == current_user.id, ParentStudent.student_id == student_id)
         )
         if result.scalar_one_or_none() is not None:
             return

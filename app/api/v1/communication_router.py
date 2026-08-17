@@ -1,6 +1,6 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
@@ -23,6 +23,18 @@ def _ensure_admin(current_user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin users can perform this action",
         )
+
+
+def _audiences_for_role(current_user: User) -> tuple[str, ...]:
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    role_audience = {
+        "ADMIN": "ADMINS",
+        "STUDENT": "STUDENTS",
+        "PARENT": "PARENTS",
+        "TEACHER": "TEACHERS",
+        "FACULTY": "TEACHERS",
+    }.get(role_name)
+    return ("ALL", role_audience) if role_audience else ("ALL",)
 
 
 @communication_router.get("/statistics")
@@ -71,7 +83,16 @@ async def create_announcement(payload: AnnouncementCreate, session: AsyncSession
     _ensure_admin(current_user)
     return await announcement_service.create_announcement(session, payload.model_dump())
 @announcement_router.get("", response_model=list[AnnouncementResponse])
-async def get_announcements(session: AsyncSession = Depends(get_db)): return await announcement_service.get_announcements(session)
+async def get_announcements(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role.role_name == "ADMIN":
+        return await announcement_service.get_announcements(session)
+    result = await session.execute(
+        select(Announcement).where(Announcement.target_audience.in_(_audiences_for_role(current_user)))
+    )
+    return result.scalars().all()
 @announcement_router.get("/{item_id}", response_model=AnnouncementResponse)
 async def get_announcement(item_id: UUID, session: AsyncSession = Depends(get_db)): return await announcement_service.get(session, item_id)
 @announcement_router.put("/{item_id}", response_model=AnnouncementResponse)
@@ -90,7 +111,13 @@ async def create_notification(payload: NotificationCreate, session: AsyncSession
     _ensure_admin(current_user)
     return await notification_service.create(session, payload.model_dump(exclude_none=True))
 @notification_router.get("", response_model=list[NotificationResponse])
-async def get_notifications(session: AsyncSession = Depends(get_db)): return await notification_service.list(session)
+async def get_notifications(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role.role_name == "ADMIN":
+        return await notification_service.list(session)
+    return await notification_service.get_notifications(session, current_user.id)
 @notification_router.get("/{item_id}", response_model=NotificationResponse)
 async def get_notification(item_id: UUID, session: AsyncSession = Depends(get_db)): return await notification_service.get(session, item_id)
 @notification_router.put("/{item_id}", response_model=NotificationResponse)
@@ -111,7 +138,18 @@ message_router = APIRouter()
 async def send_message(payload: MessageCreate, session: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await message_service.send_message(session, payload.model_dump(exclude_none=True))
 @message_router.get("", response_model=list[MessageResponse])
-async def get_messages(session: AsyncSession = Depends(get_db)): return await message_service.list(session)
+async def get_messages(
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role.role_name == "ADMIN":
+        return await message_service.list(session)
+    result = await session.execute(
+        select(Message).where(
+            or_(Message.sender_id == current_user.id, Message.receiver_id == current_user.id)
+        )
+    )
+    return result.scalars().all()
 @message_router.get("/conversation", response_model=list[MessageResponse])
 async def get_conversation(sender_id: UUID, receiver_id: UUID, session: AsyncSession = Depends(get_db)): return await message_service.get_conversation(session, sender_id, receiver_id)
 @message_router.get("/{item_id}", response_model=MessageResponse)

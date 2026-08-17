@@ -12,6 +12,7 @@ from app.models.class_model import Class
 from app.models.communication_model import Message
 from app.models.event_model import Event
 from app.models.exam_result_model import ExamResult
+from app.models.exam_model import Exam
 from app.models.student_model import Student
 from app.models.subject_model import Subject
 from app.models.teacher_model import Teacher
@@ -321,17 +322,17 @@ async def get_teacher_exam_results(
 ):
     await _ensure_teacher_access(teacher_id, session, current_user)
     result = await session.execute(
-        select(ExamResult, Class, Subject, Student)
-        .join(Class, Class.id == ExamResult.class_id)
+        select(ExamResult, Exam, Class, Subject, Student)
+        .join(Exam, Exam.id == ExamResult.exam_id)
+        .join(Class, Class.id == Exam.class_id)
         .join(Subject, Subject.id == ExamResult.subject_id)
         .join(Student, Student.id == ExamResult.student_id)
-        .where(
-            ExamResult.class_id.in_(
-                select(Class.id)
-                .join(Timetable, Timetable.class_id == Class.id)
-                .where(Timetable.teacher_id == teacher_id)
-            )
+        .join(
+            TeacherSubject,
+            (TeacherSubject.class_id == Exam.class_id)
+            & (TeacherSubject.subject_id == ExamResult.subject_id),
         )
+        .where(TeacherSubject.teacher_id == teacher_id)
         .order_by(ExamResult.created_at.desc())
         .limit(50)
     )
@@ -342,11 +343,11 @@ async def get_teacher_exam_results(
             "student_name": f"{student.first_name or ''} {student.last_name or ''}".strip() or student.admission_no,
             "class_name": cls.class_name,
             "subject_name": subject.subject_name,
-            "exam_name": result.exam_name,
+            "exam_name": exam.exam_name,
             "marks_obtained": float(result.marks_obtained) if result.marks_obtained else 0,
-            "max_marks": float(result.max_marks) if result.max_marks else 100,
+            "max_marks": float(exam.max_marks) if exam.max_marks else 100,
             "grade": result.grade,
             "created_at": str(result.created_at),
         }
-        for result, cls, subject, student in rows
+        for result, exam, cls, subject, student in rows
     ]

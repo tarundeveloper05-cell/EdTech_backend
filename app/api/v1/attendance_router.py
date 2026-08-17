@@ -1,11 +1,15 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.auth.routes import get_current_user
 from app.core.database import get_db
+from app.models.parent_model import Parent
+from app.models.parent_student_model import ParentStudent
+from app.models.student_model import Student
 from app.models.user import User
 from app.schemas.attendance_schema import (
     AttendanceCreate,
@@ -30,6 +34,34 @@ def _ensure_teacher_or_admin(current_user: User) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admin or teacher users can perform this action",
         )
+
+
+async def _ensure_student_access(
+    session: AsyncSession,
+    current_user: User,
+    student_id: UUID,
+) -> None:
+    role_name = current_user.role.role_name.upper() if current_user.role else ""
+    if role_name in ("ADMIN", "TEACHER"):
+        return
+    if role_name == "STUDENT":
+        result = await session.execute(
+            select(Student).where(Student.id == student_id, Student.user_id == current_user.id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    if role_name == "PARENT":
+        result = await session.execute(
+            select(ParentStudent)
+            .join(Parent, Parent.id == ParentStudent.parent_id)
+            .where(Parent.user_id == current_user.id, ParentStudent.student_id == student_id)
+        )
+        if result.scalar_one_or_none() is not None:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="You do not have permission to access this student's attendance",
+    )
 
 
 @router.post("", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
@@ -59,8 +91,11 @@ async def get_all_attendance(session: AsyncSession = Depends(get_db)):
 
 @router.get("/student/{student_id}", response_model=list[AttendanceResponse])
 async def get_attendance_by_student(
-    student_id: UUID, session: AsyncSession = Depends(get_db)
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_student_access(session, current_user, student_id)
     return await attendance_service.get_student_attendance(session, student_id)
 
 
@@ -91,7 +126,9 @@ async def get_student_report(
     start_date: date = Query(...),
     end_date: date = Query(...),
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_student_access(session, current_user, student_id)
     records = await attendance_service.get_student_report(
         session, student_id, start_date, end_date
     )
@@ -100,8 +137,11 @@ async def get_student_report(
 
 @router.get("/student/{student_id}/summary", response_model=StudentAttendanceSummary)
 async def get_student_summary(
-    student_id: UUID, session: AsyncSession = Depends(get_db)
+    student_id: UUID,
+    session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    await _ensure_student_access(session, current_user, student_id)
     return await attendance_service.get_student_summary(session, student_id)
 
 
